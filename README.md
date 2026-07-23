@@ -66,7 +66,7 @@ On start, the application will initialize a local SQLite database file (`evoting
 
 ### 2. Access the Portal
 Open your web browser and navigate to:
-👉 **[http://127.0.0.1:5000](http://127.0.0.1:5000)**
+ **[http://127.0.0.1:5000](http://127.0.0.1:5000)**
 
 ---
 
