@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeshGarv - Voter Registration</title>
+    <meta name="description" content="Register as a new voter on the DeshGarv E-Voting Portal. Complete your Aadhaar-based registration to participate in secure online elections.">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images__1_-removebg-preview.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .register-page {
+            max-width: 650px;
+            margin: 30px auto 50px;
+            padding: 0 20px;
+        }
+
+        .register-card {
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 14px;
+            padding: 40px 35px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
+            border-top: 6px solid #222674;
+            animation: slideUp 0.4s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .register-header h1 {
+            color: #222674;
+            font-size: 1.7em;
+            margin: 0 0 5px;
+        }
+
+        .register-header p {
+            color: #666;
+            font-size: 0.95em;
+            margin: 0;
+        }
+
+        .reg-form-group {
+            margin-bottom: 22px;
+        }
+
+        .reg-form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #333;
+            font-size: 0.95em;
+        }
+
+        .reg-form-group label .required {
+            color: #b71c1c;
+        }
+
+        .reg-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+            background: #fafafa;
+        }
+
+        .reg-input:focus {
+            border-color: #222674;
+            outline: none;
+            background: white;
+        }
+
+        .reg-select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+            background: #fafafa;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .reg-select:focus {
+            border-color: #222674;
+            outline: none;
+        }
+
+        .photo-upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+            position: relative;
+        }
+
+        .photo-upload-area:hover {
+            border-color: #222674;
+            background: #f0f0ff;
+        }
+
+        .photo-upload-area.has-file {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+
+        .photo-upload-area .material-icons {
+            font-size: 3em;
+            color: #999;
+            margin-bottom: 8px;
+        }
+
+        .photo-upload-area.has-file .material-icons {
+            color: #4caf50;
+        }
+
+        .photo-upload-area p {
+            margin: 0;
+            color: #777;
+            font-size: 0.95em;
+        }
+
+        .photo-upload-area .file-name {
+            color: #222674;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        #photo-input {
+            display: none;
+        }
+
+        .photo-preview {
+            display: none;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 10px auto 0;
+            border: 3px solid #4caf50;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .photo-preview.visible {
+            display: block;
+        }
+
+        .reg-error {
+            display: none;
+            color: #b71c1c;
+            background-color: #ffebee;
+            padding: 12px 14px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+            border: 1px solid #ffcdd2;
+        }
+
+        .reg-error.visible {
+            display: block;
+        }
+
+        .reg-success {
+            display: none;
+            color: #1b5e20;
+            background-color: #e8f5e9;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 0.95em;
+            border: 1px solid #c8e6c9;
+            text-align: center;
+        }
+
+        .reg-success.visible {
+            display: block;
+        }
+
+        .reg-submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: black;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.15em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .reg-submit-btn:hover {
+            background: linear-gradient(135deg, #f57c00, #ef6c00);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+        }
+
+        .reg-submit-btn:disabled {
+            background: #ccc;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .info-note {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 12px 14px;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.88em;
+            color: #333;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        .info-note strong {
+            color: #1976d2;
+        }
+
+        .step-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .step-dot {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .step-dot .dot {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.85em;
+            color: white;
+        }
+
+        .step-dot.active .dot {
+            background: #222674;
+        }
+
+        .step-dot.active {
+            color: #222674;
+            font-weight: bold;
+        }
+
+        .step-dot.done .dot {
+            background: #4caf50;
+        }
+
+        .back-home-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #222674;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-top: 20px;
+            transition: opacity 0.2s;
+        }
+
+        .back-home-link:hover {
+            opacity: 0.7;
+        }
+
+        .reg-footer {
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAV BAR -->
+    <nav class="navbar">
+        <div class="navbar-logo">
+            <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" class="logo" alt="DeshGarv Logo">
+            <div>
+                <div class="navbar-title" style="color: #ff9800;">देशगर्व / DESHGARV</div>
+                <div class="navbar-subtitle" style="color: white;">National E-Voting Portal</div>
+            </div>
+        </div>
+        <div class="navbar-buttons">
+            <button class="button" onclick="location.href='/'">
+                <span class="material-icons">home</span>
+                Home
+            </button>
+            <button class="button login-button" onclick="location.href='/admin'">Admin Login</button>
+        </div>
+    </nav>
+
+    <!-- Background -->
+    <div class="background">
+        <img src="{{ url_for('static', filename='abstract-wavy-indian-flag-design_1055-9791-try.jpg') }}" style="opacity: 0.3;" alt="Background" class="background-image"/>
+    </div>
+
+    <!-- Registration Form -->
+    <div class="register-page">
+        <div class="register-card">
+            <div class="register-header">
+                <h1><span class="material-icons" style="font-size: 1em; vertical-align: middle; margin-right: 6px;">how_to_reg</span> New Voter Registration</h1>
+                <p>Register to participate in India's secure online elections</p>
+            </div>
+
+            <div class="step-indicators">
+                <div class="step-dot active" id="step1-dot"><div class="dot">1</div> Details</div>
+                <div class="step-dot" id="step2-dot"><div class="dot">2</div> Photo</div>
+                <div class="step-dot" id="step3-dot"><div class="dot">3</div> Done</div>
+            </div>
+
+            <div class="info-note">
+                <strong>ℹ️ Demo Mode:</strong> This is a demonstration portal. Enter any 12-digit Aadhaar number, your name, a 10-digit phone number, select a constituency, and upload a clear face photo for the AI face recognition system.
+            </div>
+
+            <div id="reg-error" class="reg-error"></div>
+            <div id="reg-success" class="reg-success"></div>
+
+            <form id="register-form" enctype="multipart/form-data">
+                <!-- Step 1: Personal Details -->
+                <div id="step1-fields">
+                    <div class="reg-form-group">
+                        <label for="reg-name">Full Name <span class="required">*</span></label>
+                        <input type="text" id="reg-name" class="reg-input" placeholder="Enter your full name" required>
+                    </div>
+
+                    <div class="reg-form-group">
+                        <label for="reg-aadhaar">Aadhaar Card Number <span class="required">*</span></label>
+                        <input type="text" id="reg-aadhaar" class="reg-input" placeholder="Enter 12-digit Aadhaar number" maxlength="12" required>
+                    </div>
+
+                    <div class="reg-form-group">
+                        <label for="reg-phone">Registered Mobile Number <span class="required">*</span></label>
+                        <input type="text" id="reg-phone" class="reg-input" placeholder="Enter 10-digit mobile number" maxlength="10" required>
+                    </div>
+
+                    <div class="reg-form-group">
+                        <label for="reg-constituency">Constituency <span class="required">*</span></label>
+                        <select id="reg-constituency" class="reg-select" required>
+                            <option value="" disabled selected>-- Select your constituency --</option>
+                            <option value="New Delhi">New Delhi</option>
+                            <option value="Mumbai South">Mumbai South</option>
+                        </select>
+                    </div>
+
+                    <button type="button" class="reg-submit-btn" id="next-to-photo-btn" onclick="goToStep2()">
+                        Next: Upload Photo
+                        <span class="material-icons">arrow_forward</span>
+                    </button>
+                </div>
+
+                <!-- Step 2: Photo Upload -->
+                <div id="step2-fields" style="display: none;">
+                    <div class="reg-form-group">
+                        <label>Reference Face Photo <span class="required">*</span></label>
+                        <p style="font-size: 0.88em; color: #666; margin: 0 0 10px;">Upload a clear, front-facing photo. This will be used for AI face verification when you cast your vote.</p>
+                        <div class="photo-upload-area" id="photo-drop-area" onclick="document.getElementById('photo-input').click()">
+                            <span class="material-icons" id="upload-icon">cloud_upload</span>
+                            <p id="upload-text">Click to upload or drag & drop your photo</p>
+                            <p class="file-name" id="file-name-display"></p>
+                            <img class="photo-preview" id="photo-preview" alt="Preview">
+                        </div>
+                        <input type="file" id="photo-input" accept="image/jpeg,image/png,image/jpg">
+                    </div>
+
+                    <div style="display: flex; gap: 12px;">
+                        <button type="button" class="reg-submit-btn" style="background: #e0e0e0; color: #333; flex: 0.4;" onclick="goBackToStep1()">
+                            <span class="material-icons">arrow_back</span>
+                            Back
+                        </button>
+                        <button type="button" class="reg-submit-btn" id="submit-reg-btn" style="flex: 0.6;" onclick="submitRegistration()">
+                            <span class="material-icons">how_to_reg</span>
+                            Register as Voter
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Success -->
+                <div id="step3-fields" style="display: none; text-align: center; padding: 20px 0;">
+                    <div style="font-size: 4em; color: #4caf50; margin-bottom: 10px;">✓</div>
+                    <h2 style="color: #222674; margin: 0 0 10px;">Registration Successful!</h2>
+                    <p style="color: #555; font-size: 1.05em;" id="success-detail"></p>
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left; font-family: monospace; font-size: 0.9em;">
+                        <strong>--- YOUR VOTER DETAILS ---</strong><br>
+                        Name: <span id="receipt-name"></span><br>
+                        Aadhaar: <span id="receipt-aadhaar"></span><br>
+                        Phone: <span id="receipt-phone"></span><br>
+                        Constituency: <span id="receipt-const"></span><br>
+                        Status: <span style="color: #4caf50; font-weight: bold;">REGISTERED ✓</span><br>
+                        <strong>--------------------------</strong>
+                    </div>
+                    <button type="button" class="reg-submit-btn" onclick="location.href='/'">
+                        <span class="material-icons">home</span>
+                        Go to Homepage & Cast Your Vote
+                    </button>
+                </div>
+            </form>
+
+            <div class="reg-footer" id="reg-footer-link">
+                <a href="/" class="back-home-link">
+                    <span class="material-icons" style="font-size: 1.1em;">arrow_back</span>
+                    Back to Homepage
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Step navigation
+        function goToStep2() {
+            const name = document.getElementById('reg-name').value.trim();
+            const aadhaar = document.getElementById('reg-aadhaar').value.trim();
+            const phone = document.getElementById('reg-phone').value.trim();
+            const constituency = document.getElementById('reg-constituency').value;
+            const errorDiv = document.getElementById('reg-error');
+            errorDiv.classList.remove('visible');
+
+            if (!name) {
+                showError("Please enter your full name.");
+                return;
+            }
+            if (aadhaar.length !== 12 || isNaN(aadhaar)) {
+                showError("Please enter a valid 12-digit Aadhaar number.");
+                return;
+            }
+            if (phone.length !== 10 || isNaN(phone)) {
+                showError("Please enter a valid 10-digit mobile number.");
+                return;
+            }
+            if (!constituency) {
+                showError("Please select your constituency.");
+                return;
+            }
+
+            document.getElementById('step1-fields').style.display = 'none';
+            document.getElementById('step2-fields').style.display = 'block';
+            document.getElementById('step1-dot').classList.remove('active');
+            document.getElementById('step1-dot').classList.add('done');
+            document.getElementById('step2-dot').classList.add('active');
+        }
+
+        function goBackToStep1() {
+            document.getElementById('step2-fields').style.display = 'none';
+            document.getElementById('step1-fields').style.display = 'block';
+            document.getElementById('step2-dot').classList.remove('active');
+            document.getElementById('step1-dot').classList.remove('done');
+            document.getElementById('step1-dot').classList.add('active');
+        }
+
+        function showError(msg) {
+            const errorDiv = document.getElementById('reg-error');
+            errorDiv.innerText = msg;
+            errorDiv.classList.add('visible');
+            errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Photo preview
+        const photoInput = document.getElementById('photo-input');
+        const dropArea = document.getElementById('photo-drop-area');
+        const previewImg = document.getElementById('photo-preview');
+
+        photoInput.addEventListener('change', function() {
+            handleFile(this.files[0]);
+        });
+
+        // Drag & drop support
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = '#222674';
+            dropArea.style.background = '#f0f0ff';
+        });
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.style.borderColor = '#ccc';
+            dropArea.style.background = '#fafafa';
+        });
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = '#ccc';
+            dropArea.style.background = '#fafafa';
+            if (e.dataTransfer.files.length > 0) {
+                photoInput.files = e.dataTransfer.files;
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+            const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+            if (!validTypes.includes(file.type)) {
+                showError("Please upload a JPG or PNG image file.");
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showError("Photo must be under 5 MB.");
+                return;
+            }
+
+            document.getElementById('reg-error').classList.remove('visible');
+            document.getElementById('upload-icon').innerText = 'check_circle';
+            document.getElementById('upload-text').innerText = 'Photo selected:';
+            document.getElementById('file-name-display').innerText = file.name;
+            dropArea.classList.add('has-file');
+
+            // Show circular preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                previewImg.classList.add('visible');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Submit registration
+        function submitRegistration() {
+            const file = photoInput.files[0];
+            const errorDiv = document.getElementById('reg-error');
+            errorDiv.classList.remove('visible');
+
+            if (!file) {
+                showError("Please upload a reference face photo.");
+                return;
+            }
+
+            const submitBtn = document.getElementById('submit-reg-btn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="material-icons" style="animation: spin 1s linear infinite;">sync</span> Registering...';
+
+            const formData = new FormData();
+            formData.append('name', document.getElementById('reg-name').value.trim());
+            formData.append('aadhaar', document.getElementById('reg-aadhaar').value.trim());
+            formData.append('phone', document.getElementById('reg-phone').value.trim());
+            formData.append('constituency', document.getElementById('reg-constituency').value);
+            formData.append('photo', file);
+
+            fetch('/register', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Show step 3
+                    document.getElementById('step2-fields').style.display = 'none';
+                    document.getElementById('step3-fields').style.display = 'block';
+                    document.getElementById('step2-dot').classList.remove('active');
+                    document.getElementById('step2-dot').classList.add('done');
+                    document.getElementById('step3-dot').classList.add('active');
+                    document.getElementById('step3-dot').classList.add('done');
+                    document.getElementById('reg-footer-link').style.display = 'none';
+
+                    document.getElementById('success-detail').innerText =
+                        `You are now registered to vote in the ${document.getElementById('reg-constituency').value} constituency.`;
+                    document.getElementById('receipt-name').innerText = document.getElementById('reg-name').value.trim();
+                    document.getElementById('receipt-aadhaar').innerText = document.getElementById('reg-aadhaar').value.trim().replace(/(\d{4})(\d{4})(\d{4})/, '$1 $2 $3');
+                    document.getElementById('receipt-phone').innerText = document.getElementById('reg-phone').value.trim();
+                    document.getElementById('receipt-const').innerText = document.getElementById('reg-constituency').value;
+                } else {
+                    showError(data.message || "Registration failed.");
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span class="material-icons">how_to_reg</span> Register as Voter';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                showError("Connection error. Please try again.");
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-icons">how_to_reg</span> Register as Voter';
+            });
+        }
+    </script>
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+</html>

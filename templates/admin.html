@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeshGarv - ECI Admin Portal</title>
+    <meta name="description" content="Secure administrative login portal for Election Commission officials to access election results and system monitoring.">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images__1_-removebg-preview.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .admin-page {
+            min-height: calc(100vh - 60px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .admin-login-card {
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 16px;
+            padding: 45px 40px;
+            max-width: 440px;
+            width: 100%;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+            border-top: 6px solid #222674;
+            text-align: center;
+            animation: cardSlideIn 0.4s ease;
+        }
+
+        @keyframes cardSlideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .admin-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 15px;
+            display: block;
+        }
+
+        .admin-login-card h1 {
+            color: #222674;
+            font-size: 1.6em;
+            margin: 0 0 5px;
+        }
+
+        .admin-login-card .subtitle {
+            color: #666;
+            font-size: 0.95em;
+            margin-bottom: 30px;
+        }
+
+        .admin-form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .admin-form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #333;
+            font-size: 0.95em;
+        }
+
+        .admin-form-group .input-wrapper {
+            position: relative;
+        }
+
+        .admin-form-group .input-wrapper .material-icons {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+            font-size: 1.2em;
+        }
+
+        .admin-input {
+            width: 100%;
+            padding: 12px 12px 12px 42px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+            background: #fafafa;
+        }
+
+        .admin-input:focus {
+            border-color: #222674;
+            outline: none;
+            background: white;
+        }
+
+        .admin-error {
+            display: none;
+            color: #b71c1c;
+            background-color: #ffebee;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+            border: 1px solid #ffcdd2;
+            text-align: left;
+        }
+
+        .admin-error.visible {
+            display: block;
+        }
+
+        .admin-submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #222674, #1f2365);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .admin-submit-btn:hover {
+            background: linear-gradient(135deg, #1a1e5c, #161a4a);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(34, 38, 116, 0.3);
+        }
+
+        .admin-footer-note {
+            margin-top: 25px;
+            font-size: 0.82em;
+            color: #999;
+            line-height: 1.4;
+        }
+
+        .admin-footer-note .material-icons {
+            font-size: 0.95em;
+            vertical-align: middle;
+        }
+
+        .back-home-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #222674;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-top: 20px;
+            transition: opacity 0.2s;
+        }
+
+        .back-home-link:hover {
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAV BAR -->
+    <nav class="navbar">
+        <div class="navbar-logo">
+            <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" class="logo" alt="DeshGarv Logo">
+            <div>
+                <div class="navbar-title" style="color: #ff9800;">देशगर्व / DESHGARV</div>
+                <div class="navbar-subtitle" style="color: white;">National E-Voting Portal</div>
+            </div>
+        </div>
+        <div class="navbar-buttons">
+            <button class="button" onclick="location.href='/'">
+                <span class="material-icons">home</span>
+                Home
+            </button>
+        </div>
+    </nav>
+
+    <!-- Background -->
+    <div class="background">
+        <img src="{{ url_for('static', filename='abstract-wavy-indian-flag-design_1055-9791-try.jpg') }}" style="opacity: 0.3;" alt="Background" class="background-image"/>
+    </div>
+
+    <!-- Admin Login Card -->
+    <div class="admin-page">
+        <div class="admin-login-card">
+            <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" alt="DeshGarv Logo" class="admin-logo">
+            <h1>ECI Admin Portal</h1>
+            <p class="subtitle">Authorized personnel only. Enter your credentials to access the election monitoring dashboard.</p>
+
+            <div id="admin-error" class="admin-error"></div>
+
+            <form id="admin-login-form" onsubmit="return handleAdminLogin(event)">
+                <div class="admin-form-group">
+                    <label for="admin-username">Username</label>
+                    <div class="input-wrapper">
+                        <span class="material-icons">person</span>
+                        <input type="text" id="admin-username" class="admin-input" placeholder="Enter admin username" required autocomplete="username">
+                    </div>
+                </div>
+
+                <div class="admin-form-group">
+                    <label for="admin-password">Password</label>
+                    <div class="input-wrapper">
+                        <span class="material-icons">lock</span>
+                        <input type="password" id="admin-password" class="admin-input" placeholder="Enter admin password" required autocomplete="current-password">
+                    </div>
+                </div>
+
+                <button type="submit" class="admin-submit-btn">
+                    <span class="material-icons">login</span>
+                    Authenticate & Login
+                </button>
+            </form>
+
+            <p class="admin-footer-note">
+                <span class="material-icons">shield</span>
+                This portal is monitored. Unauthorized access attempts are logged and may be reported to cybersecurity authorities.
+            </p>
+
+            <a href="/" class="back-home-link">
+                <span class="material-icons" style="font-size: 1.1em;">arrow_back</span>
+                Back to Homepage
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function handleAdminLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('admin-username').value.trim();
+            const password = document.getElementById('admin-password').value.trim();
+            const errorDiv = document.getElementById('admin-error');
+
+            errorDiv.classList.remove('visible');
+
+            if (!username || !password) {
+                errorDiv.innerText = "Both username and password are required.";
+                errorDiv.classList.add('visible');
+                return false;
+            }
+
+            fetch('/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, password: password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = '/results';
+                } else {
+                    errorDiv.innerText = data.message || "Authentication failed.";
+                    errorDiv.classList.add('visible');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                errorDiv.innerText = "Connection error. Please try again.";
+                errorDiv.classList.add('visible');
+            });
+
+            return false;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeshGarv - Secure E-Voting Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .voting-container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border-top: 5px solid #222674;
+        }
+
+        .voter-badge-card {
+            background: linear-gradient(135deg, #1f2365, #2c3e50);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .voter-badge-card h3 {
+            margin: 0 0 5px 0;
+            color: #ff9800;
+        }
+
+        .voter-info-item {
+            margin-right: 25px;
+            font-size: 1.1em;
+        }
+
+        .candidate-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 25px;
+        }
+
+        @media (max-width: 768px) {
+            .candidate-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .candidate-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .candidate-card:hover {
+            border-color: #ff9800;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+        }
+
+        .candidate-card:focus-within {
+            border-color: #ff9800;
+            box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.3);
+            outline: none;
+        }
+
+        .candidate-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .party-badge {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.3em;
+            color: white;
+            text-transform: uppercase;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Party colors */
+        .badge-bjp { background: linear-gradient(135deg, #FF9933, #FF6600); }
+        .badge-inc { background: linear-gradient(135deg, #1976D2, #0D47A1); }
+        .badge-aap { background: linear-gradient(135deg, #00B0FF, #0091EA); }
+        .badge-nota { background: linear-gradient(135deg, #757575, #424242); }
+        .badge-ind { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
+
+        .candidate-details h3 {
+            margin: 0;
+            color: #222674;
+            font-size: 1.25em;
+        }
+
+        .candidate-details p {
+            margin: 4px 0 0 0;
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .vote-btn-action {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .vote-btn-action:hover {
+            background-color: #388e3c;
+        }
+
+        /* Confirmation & Success Modals */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            border-top: 6px solid #ff9800;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-content h3 {
+            color: #222674;
+            font-size: 1.6em;
+            margin-top: 0;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .modal-btn {
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1.05em;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-confirm {
+            background-color: #ff9800;
+            color: black;
+        }
+
+        .btn-confirm:hover {
+            background-color: #f57c00;
+        }
+
+        .btn-cancel {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-cancel:hover {
+            background-color: #bdbdbd;
+        }
+
+        .receipt-card {
+            background-color: #f9f9f9;
+            border: 2px dashed #ccc;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+            text-align: left;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        /* Accessibility text guidance */
+        .accessible-guide-bar {
+            background-color: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 12px;
+            margin-bottom: 25px;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.95em;
+        }
+
+        .accessible-guide-bar a {
+            color: #1976d2;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAV BAR -->
+    <nav class="navbar">
+        <div class="navbar-logo">
+            <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" class="logo" alt="DeshGarv Logo">
+            <div>
+                <div class="navbar-title" style="color: #ff9800;">देशगर्ब / DESHGARV</div>
+                <div class="navbar-subtitle" style="color: white;">National E-Voting Portal</div>
+            </div>
+        </div>
+        <div class="navbar-buttons">
+            <div id="google_translate_element" class="dropdown"></div>
+            <button class="button" onclick="speakPageGuide()">🔊 Speak Instructions</button>
+            <button class="button login-button" id="logout-safety-btn">Cancel Voting Session</button>
+        </div>
+    </nav>
+
+    <!-- BACKGROUND GRAPHIC -->
+    <div class="background">
+        <img src="{{ url_for('static', filename='abstract-wavy-indian-flag-design_1055-9791.jpg') }}" class="background-image" alt="Indian Flag Graphic Background">
+    </div>
+
+    <!-- MAIN VOTING CONTAINER -->
+    <main class="main-section" style="padding-top: 80px;">
+        <div class="voting-container">
+            
+            <div class="accessible-guide-bar">
+                <strong>Accessibility Support:</strong> Hovering or focusing on any candidate card will automatically read out the candidate name and party affiliation. You can click 
+                <a href="#" onclick="speakPageGuide(); return false;">Speak Instructions</a> at any time to hear help prompts.
+            </div>
+
+            <!-- Voter Badge Card -->
+            <div class="voter-badge-card">
+                <div>
+                    <h3>VERIFIED CITIZEN VOTE CARD</h3>
+                    <div style="display: flex; flex-wrap: wrap; margin-top: 10px;">
+                        <div class="voter-info-item">Name: <strong id="voter-name">Loading...</strong></div>
+                        <div class="voter-info-item">Aadhaar: <strong id="voter-aadhaar">Loading...</strong></div>
+                        <div class="voter-info-item">Constituency: <strong id="voter-constituency" style="color:#ff9800;">Loading...</strong></div>
+                    </div>
+                </div>
+                <div style="font-size: 0.9em; border: 1px solid #ff9800; padding: 5px 10px; border-radius: 4px;">
+                    🟢 SECURE SESSION ACTIVE
+                </div>
+            </div>
+
+            <h2 style="color: #222674; border-bottom: 2px solid #222674; padding-bottom: 10px;">Official Candidates Ballot Sheet</h2>
+            <p>Please review the options below carefully. Select your chosen candidate and click the <strong>Vote</strong> button. You can only cast a single vote.</p>
+
+            <div id="candidate-list-grid" class="candidate-grid">
+                <!-- Sourced dynamically via API -->
+            </div>
+
+        </div>
+    </main>
+
+    <!-- CONFIRMATION MODAL -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Confirm Your Ballot Vote</h3>
+            <p style="font-size: 1.1em; margin: 20px 0;">Are you sure you want to cast your official vote for:</p>
+            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 6px; font-weight: bold; margin-bottom: 25px;">
+                <p id="confirm-cand-name" style="font-size: 1.3em; margin: 0; color: #222674;"></p>
+                <p id="confirm-cand-party" style="font-size: 1em; margin: 5px 0 0 0; color: #666;"></p>
+            </div>
+            <p style="color: #b71c1c; font-size: 0.9em; font-weight: bold;">⚠️ WARNING: This action is irreversible. Your vote will be cryptographically locked.</p>
+            <div class="modal-actions">
+                <button class="modal-btn btn-cancel" id="cancel-vote-btn">Cancel</button>
+                <button class="modal-btn btn-confirm" id="confirm-vote-btn">Cast Ballot</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUCCESS RECEIPT MODAL -->
+    <div id="success-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px; border-top-color: #4caf50;">
+            <div style="font-size: 4em; color: #4caf50; margin-bottom: 10px;">✓</div>
+            <h3>Vote Cast Successfully!</h3>
+            <p>Thank you for participating in the democratic process. Your vote has been logged securely and anonymized.</p>
+            
+            <div class="receipt-card">
+                <strong>--- ECI OFFICIAL E-RECEIPT ---</strong><br>
+                Constituency: <span id="receipt-constituency"></span><br>
+                Timestamp: <span id="receipt-time"></span><br>
+                Audit Log SHA-256 Hash:<br>
+                <span id="receipt-hash" style="color: #c2185b; font-size: 0.9em; word-break: break-all;"></span><br>
+                <strong>-----------------------------</strong>
+            </div>
+            
+            <div class="modal-actions" style="flex-direction: column; gap: 10px;">
+                <button class="modal-btn btn-confirm" id="download-receipt-btn" style="background-color: #222674; color: white;">Download E-Receipt</button>
+                <button class="modal-btn btn-cancel" id="close-success-btn">Finish Session</button>
+            </div>
+            <p style="font-size: 0.85em; color: #888; margin-top: 15px;">Session will automatically terminate in <span id="redirect-timer">8</span> seconds.</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='homepage.js') }}"></script>
+    <script>
+        let selectedCandidateId = null;
+        let selectedCandName = "";
+        let selectedCandParty = "";
+        let voterNameVal = "";
+        let constituencyVal = "";
+
+        // Page load - Fetch voter details and candidate options
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/voter_details')
+                .then(res => {
+                    if (!res.ok) {
+                        window.location.href = "/";
+                        return;
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data && data.success) {
+                        voterNameVal = data.voter.name;
+                        constituencyVal = data.voter.constituency;
+                        document.getElementById('voter-name').innerText = data.voter.name;
+                        document.getElementById('voter-aadhaar').innerText = data.voter.aadhaar;
+                        document.getElementById('voter-constituency').innerText = data.voter.constituency;
+
+                        // Build candidate items
+                        const grid = document.getElementById('candidate-list-grid');
+                        grid.innerHTML = "";
+
+                        data.candidates.forEach(cand => {
+                            // Get party prefix class based on party text
+                            let badgeClass = "badge-ind";
+                            if (cand.party.includes("BJP") || cand.party.includes("Bharatiya")) badgeClass = "badge-bjp";
+                            else if (cand.party.includes("INC") || cand.party.includes("Congress")) badgeClass = "badge-inc";
+                            else if (cand.party.includes("AAP") || cand.party.includes("Aadmi")) badgeClass = "badge-aap";
+                            else if (cand.party.includes("NOTA")) badgeClass = "badge-nota";
+
+                            // Get initials for circle logo
+                            let initials = cand.party.split(" ").map(w => w[0]).join("").substring(0, 3);
+                            if (cand.party === "NOTA") initials = "❌";
+
+                            const card = document.createElement('div');
+                            card.className = "candidate-card";
+                            card.tabIndex = 0;
+                            card.setAttribute('aria-label', `Candidate ${cand.name} representing ${cand.party}`);
+                            
+                            // Attach speech events
+                            card.addEventListener('mouseenter', () => speakCandidate(cand.name, cand.party));
+                            card.addEventListener('focus', () => speakCandidate(cand.name, cand.party));
+
+                            card.innerHTML = `
+                                <div class="candidate-left">
+                                    <div class="party-badge ${badgeClass}">${initials}</div>
+                                    <div class="candidate-details">
+                                        <h3>${cand.name}</h3>
+                                        <p>${cand.party}</p>
+                                    </div>
+                                </div>
+                                <button class="vote-btn-action" onclick="triggerVoteConfirm(${cand.id}, '${cand.name}', '${cand.party}')">Vote</button>
+                            `;
+                            grid.appendChild(card);
+                        });
+
+                        speakPageGuide();
+                    }
+                });
+        });
+
+        // Speech synthesis triggers
+        function speakCandidate(name, party) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const text = `Candidate: ${name}, representing ${party}`;
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-IN';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function speakPageGuide() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const text = `Verification successful. Welcome to your voting sheet, ${voterNameVal}. You are voting in the ${constituencyVal} constituency. Please hover over candidate tiles to hear their details. Click the green Vote button next to your choice.`;
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-IN';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Cancel session safety
+        document.getElementById('logout-safety-btn').addEventListener('click', () => {
+            fetch('/stop_camera', { method: 'POST' }).finally(() => {
+                window.location.href = "/";
+            });
+        });
+
+        // Open confirm modal
+        window.triggerVoteConfirm = function(id, name, party) {
+            selectedCandidateId = id;
+            selectedCandName = name;
+            selectedCandParty = party;
+            
+            document.getElementById('confirm-cand-name').innerText = name;
+            document.getElementById('confirm-cand-party').innerText = party;
+            document.getElementById('confirm-modal').style.display = 'flex';
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const text = `Are you sure you want to cast your ballot for ${name} of ${party}?`;
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-IN';
+                window.speechSynthesis.speak(utterance);
+            }
+        };
+
+        // Close confirm modal
+        document.getElementById('cancel-vote-btn').addEventListener('click', () => {
+            document.getElementById('confirm-modal').style.display = 'none';
+        });
+
+        // Confirm vote cast
+        document.getElementById('confirm-vote-btn').addEventListener('click', () => {
+            document.getElementById('confirm-modal').style.display = 'none';
+            
+            fetch('/cast_vote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ candidate_id: selectedCandidateId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Populate receipt
+                    document.getElementById('receipt-constituency').innerText = constituencyVal;
+                    document.getElementById('receipt-time').innerText = new Date().toLocaleString();
+                    document.getElementById('receipt-hash').innerText = data.audit_hash;
+                    
+                    // Show success modal
+                    document.getElementById('success-modal').style.display = 'flex';
+
+                    // TTS confirmation
+                    if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel();
+                        const text = "Your vote has been successfully cast. Thank you for voting!";
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = 'en-IN';
+                        window.speechSynthesis.speak(utterance);
+                    }
+
+                    // Download receipt trigger details
+                    document.getElementById('download-receipt-btn').onclick = () => {
+                        downloadTextReceipt(constituencyVal, data.audit_hash);
+                    };
+
+                    // Redirect countdown
+                    let countdownVal = 8;
+                    const timerSpan = document.getElementById('redirect-timer');
+                    const interval = setInterval(() => {
+                        countdownVal--;
+                        timerSpan.innerText = countdownVal;
+                        if (countdownVal <= 0) {
+                            clearInterval(interval);
+                            window.location.href = "/";
+                        }
+                    }, 1000);
+
+                    document.getElementById('close-success-btn').onclick = () => {
+                        clearInterval(interval);
+                        window.location.href = "/";
+                    };
+                } else {
+                    alert("Voting cast error: " + (data.message || "Unknown error occurred"));
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Network connectivity error during ballot cast.");
+            });
+        });
+
+        // Function to download receipt text file
+        function downloadTextReceipt(constituency, auditHash) {
+            const receiptText = 
+`==============================================
+           DESHGARV E-VOTING PORTAL
+           ECI OFFICIAL E-RECEIPT
+==============================================
+Constituency : ${constituency}
+Timestamp    : ${new Date().toLocaleString()}
+Status       : Ballot cast successfully and locked
+Security     : Verified via DeepFace Match
+Audit Hash   : ${auditHash}
+==============================================
+Thank you for your vote! Your voice is your power.
+==============================================`;
+
+            const blob = new Blob([receiptText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ECI_Ballot_Receipt_${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

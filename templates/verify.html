@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeshGarv - Voter Verification</title>
+    <meta name="description" content="Verify your identity using Aadhaar, OTP, and AI face recognition to cast your vote securely on the DeshGarv E-Voting Portal.">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images__1_-removebg-preview.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        /* Verification Card Styles */
+        .verification-card {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            margin: 40px auto;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            border-top: 5px solid #222674;
+            transition: all 0.3s ease;
+        }
+
+        .main-section.high-contrast .verification-card {
+            background-color: black !important;
+            border: 2px solid yellow !important;
+            color: yellow !important;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .main-section.high-contrast .form-group label {
+            color: yellow !important;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            font-size: 1.1em;
+            box-sizing: border-box;
+            text-align: center;
+            letter-spacing: 2px;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #222674;
+            outline: none;
+        }
+
+        #successMessage {
+            display: none;
+            color: #1b5e20;
+            background-color: #e8f5e9;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-weight: bold;
+            border: 1px solid #c8e6c9;
+        }
+
+        #successMessage.visible {
+            display: block;
+        }
+
+        .main-section.high-contrast #successMessage {
+            background-color: black !important;
+            color: yellow !important;
+            border: 1px solid yellow !important;
+        }
+
+        .alert-error {
+            color: #b71c1c;
+            background-color: #ffebee;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-weight: bold;
+            border: 1px solid #ffcdd2;
+            display: none;
+        }
+
+        .main-section.high-contrast .alert-error {
+            background-color: black !important;
+            color: red !important;
+            border: 1px solid red !important;
+        }
+
+        #otp-input {
+            display: none;
+            margin: 10px auto;
+        }
+        #verifyOtpBtn {
+            margin: 10px auto;
+            background-color: #222674;
+            color: white;
+        }
+        #sendOtpBtn {
+            background-color: #ff9800;
+            color: black;
+            font-weight: bold;
+            margin: 0 auto;
+        }
+        #proceed-btn {
+            background-color: #2e7d32;
+            color: white;
+            font-weight: bold;
+            width: 100%;
+            height: 45px;
+            margin-top: 20px;
+        }
+        #proceed-btn:disabled {
+            background-color: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+        }
+        .main-section.high-contrast #proceed-btn {
+            background-color: yellow !important;
+            color: black !important;
+        }
+        .main-section.high-contrast #proceed-btn:disabled {
+            background-color: #333333 !important;
+            color: #888888 !important;
+            border: 1px solid #555555 !important;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        .verify-header {
+            text-align: center;
+            margin: 30px auto 10px;
+            color: #222674;
+        }
+        .verify-header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+        .verify-header p {
+            font-size: 1.1em;
+            color: #555;
+        }
+        .main-section.high-contrast .verify-header h1,
+        .main-section.high-contrast .verify-header p {
+            color: yellow !important;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #222674;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.95em;
+            margin: 20px auto;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+        .back-link:hover {
+            background-color: rgba(34, 38, 116, 0.08);
+        }
+        .main-section.high-contrast .back-link {
+            color: yellow !important;
+        }
+
+        /* Audio link styling */
+        .audio-instructions {
+            text-align: center;
+            margin: 10px auto 20px;
+        }
+        .audio-instructions a {
+            color: #34495e;
+            text-decoration: underline;
+            font-weight: bold;
+            font-size: 1.05em;
+        }
+        .audio-instructions a:hover {
+            color: #2980b9;
+        }
+        .main-section.high-contrast .audio-instructions a {
+            color: yellow !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAV BAR -->
+    <nav class="navbar">
+        <div class="navbar-logo">
+            <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" class="logo" alt="DeshGarv Logo">
+            <div>
+                <div class="navbar-title" style="color: #ff9800;">देशगर्व / DESHGARV</div>
+                <div class="navbar-subtitle" style="color: white;">National E-Voting Portal</div>
+            </div>
+        </div>
+        <div class="navbar-buttons">
+            <button class="button" onclick="location.href='/'">
+                <span class="material-icons">home</span>
+                Home
+            </button>
+
+            <div id="google_translate_element"></div>
+
+            <!-- Accessibility dropdown -->
+            <div class="dropdown">
+                <button class="button dropdown-toggle" data-dropdown="assist-dropdown">
+                    <span class="material-icons">accessibility</span>
+                </button>
+                <ul class="dropdown-menu" id="assist-dropdown">
+                    <li id="increase-size">A+</li>
+                    <li id="reset-size">A</li>
+                    <li id="decrease-size">A-</li>
+                    <li style="color: #FFFF00; background-color: #000000; text-decoration: underline;" class="high-contrast" id="high-contrast">A</li>
+                </ul>
+            </div>
+
+            <button class="button" onclick="location.href='/register'" style="background-color: #ff9800; color: black; font-weight: bold;">
+                <span class="material-icons">how_to_reg</span>
+                Register
+            </button>
+            <button class="button login-button" onclick="location.href='/admin'">Admin Login</button>
+        </div>
+    </nav>
+
+    <div class="main-section">
+        <!-- Background Image -->
+        <div class="background">
+            <img src="{{ url_for('static', filename='abstract-wavy-indian-flag-design_1055-9791-try.jpg') }}" style="opacity: 0.3;" alt="Background" class="background-image"/>
+        </div>
+
+        <!-- Back Link -->
+        <div style="text-align: center; margin-top: 10px;">
+            <a href="/" class="back-link">
+                <span class="material-icons" style="font-size: 1.2em;">arrow_back</span>
+                Back to Homepage
+            </a>
+        </div>
+
+        <!-- Page Header -->
+        <div class="verify-header">
+            <h1>Voter Verification Center</h1>
+            <p>Complete the 3-step verification process to cast your vote securely.</p>
+        </div>
+
+        <!-- Audio Instructions -->
+        <div class="audio-instructions">
+            <a href="#" onclick="speakInstructions(); return false;">🔊 Listen to Audio Instructions (Text-to-Speech)</a>
+        </div>
+
+        <!-- Voter Verification Card -->
+        <div class="verification-card">
+            <h2>Step 1: Aadhaar Authentication</h2>
+            <p>Enter your 12-digit Aadhaar number to receive a one-time password on your registered mobile.</p>
+
+            <div id="error-message" class="alert-error"></div>
+
+            <!-- Aadhaar Input Section -->
+            <div id="aadhaar-section">
+                <div class="form-group">
+                    <label for="aadhaar-input">Aadhaar Card Number:</label>
+                    <input type="text" id="aadhaar-input" class="form-input" placeholder="Enter 12-digit number" maxlength="12">
+                </div>
+                <button id="sendOtpBtn" class="button">Send OTP</button>
+            </div>
+
+            <!-- OTP Input Section -->
+            <div id="otp-section">
+                <div id="successMessage">OTP Sent!</div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <input type="text" id="otp-input" class="form-input" placeholder="Enter 6-digit OTP" maxlength="6">
+                </div>
+                <button id="verifyOtpBtn" class="button" style="display: none;">Verify OTP</button>
+            </div>
+
+            <!-- Facial Verification Section -->
+            <div id="face-section" style="display: none; margin-top: 20px;">
+                <h3 style="color: #222674;">Step 3: AI Face Match Scan</h3>
+                <p style="font-size: 0.95em; color: #555; margin-bottom: 15px;">Position your face in front of the camera. The system will auto-match your face with your Aadhaar photo registry.</p>
+                <div style="max-width: 480px; margin: 0 auto; border: 3px solid #222674; border-radius: 8px; overflow: hidden; background: #000;">
+                    <img id="camera-feed" src="" style="width: 100%; height: auto; display: block;" alt="Camera Stream">
+                </div>
+                <button id="proceed-btn" class="button" disabled>Proceed to Vote</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-container">
+                <div class="footer-left">
+                    <img src="{{ url_for('static', filename='Screenshot 2025-01-27 200724.png') }}" style="width: 200px;" alt="ECI Logo" class="eci-logo">
+                    <p>
+                        The Election Commission of India is an autonomous constitutional authority responsible
+                        for administering election processes in India. The body administers elections to the Lok Sabha,
+                        Rajya Sabha, State Legislative Assemblies in India, and the offices of the President and
+                        Vice President in the country.
+                    </p>
+                    <p>📍 Nirvachan Sadan, Ashoka Road, New Delhi 110001</p>
+                </div>
+                <div class="footer-center">
+                    <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" alt="Election Banner" class="election-banner">
+                </div>
+                <div class="footer-right">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="https://www.eci.gov.in/about-eci" target="_blank" rel="noopener">About ECI</a></li>
+                        <li><a href="#">Contact Us</a></li>
+                        <li><a href="#">Public Grievance</a></li>
+                        <li><a href="https://www.eci.gov.in/" target="_blank" rel="noopener">eOffice</a></li>
+                        <li><a href="https://voterportal.eci.gov.in/" target="_blank" rel="noopener">Apply for Voter Card</a></li>
+                        <li><a href="https://voterportal.eci.gov.in/download-e-epic-test" target="_blank" rel="noopener">Download EPIC Card</a></li>
+                        <li><a href="https://www.eci.gov.in/cvigil-app" target="_blank" rel="noopener">Download cVIGIL</a></li>
+                        <li><a href="https://www.eci.gov.in/affidavit-portal" target="_blank" rel="noopener">Candidate Affidavits</a></li>
+                        <li><a href="https://apaar.education.gov.in/" target="_blank" rel="noopener">APAR</a></li>
+                    </ul>
+                </div>
+                <div class="footer-apps">
+                    <h3>ECI Apps Links</h3>
+                    <div class="app-icons">
+                        <img src="{{ url_for('static', filename='Screenshot_2025-01-25_220324-removebg-preview.png') }}" alt="Voter App">
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                &copy; 2026 Election Commission of India. All rights reserved. DeshGarv E-Voting System.
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='homepage.js') }}" defer></script>
+    <script>
+        // Text-to-speech instructions
+        function speakInstructions() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const text = "Welcome to the DeshGarv Voter Verification Center. Step 1: Enter your twelve-digit Aadhaar card number and click Send O.T.P. Step 2: Enter the received six-digit O.T.P. and click Verify. Step 3: Position yourself in front of the webcam for face recognition. Once the system matches your face, click Proceed to Vote to choose your candidate. Make sure you are in a well-lit room and alone.";
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-IN';
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Text-to-speech is not supported in your browser.");
+            }
+        }
+
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const aadhaarInput = document.getElementById('aadhaar-input');
+            const otpInput = document.getElementById('otp-input');
+            const errorDiv = document.getElementById('error-message');
+            const successMessageDiv = document.getElementById('successMessage');
+            const cameraFeedImg = document.getElementById('camera-feed');
+            const faceSection = document.getElementById('face-section');
+
+            // Send OTP handler
+            document.getElementById('sendOtpBtn').addEventListener('click', () => {
+                const aadhaar = aadhaarInput.value.trim();
+                errorDiv.style.display = 'none';
+
+                if (aadhaar.length !== 12 || isNaN(aadhaar)) {
+                    errorDiv.innerText = "Please enter a valid 12-digit Aadhaar number.";
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                fetch('/send_otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ aadhaar: aadhaar })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        successMessageDiv.innerHTML = `OTP Sent! Simulated Code is: <strong style="font-size:1.2em; color:#d81b60;">${data.otp}</strong> (Printed to console)`;
+                        successMessageDiv.classList.add('visible');
+                        otpInput.style.display = 'block';
+                        document.getElementById('verifyOtpBtn').style.display = 'block';
+                        // Update heading to Step 2
+                        document.querySelector('.verification-card h2').textContent = 'Step 2: OTP Verification';
+                    } else {
+                        errorDiv.innerText = data.message || "Aadhaar lookup failed.";
+                        errorDiv.style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    errorDiv.innerText = "Connection error. Please try again.";
+                    errorDiv.style.display = 'block';
+                });
+            });
+
+            // Verify OTP handler
+            document.getElementById('verifyOtpBtn').addEventListener('click', () => {
+                const aadhaar = aadhaarInput.value.trim();
+                const otp = otpInput.value.trim();
+                errorDiv.style.display = 'none';
+
+                if (otp.length !== 6 || isNaN(otp)) {
+                    errorDiv.innerText = "Please enter a valid 6-digit OTP.";
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                fetch('/verify_otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ aadhaar: aadhaar, otp: otp })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('aadhaar-section').style.display = 'none';
+                        document.getElementById('otp-section').style.display = 'none';
+                        faceSection.style.display = 'block';
+                        cameraFeedImg.src = "{{ url_for('video_feed') }}";
+                    } else {
+                        errorDiv.innerText = data.message || "OTP verification failed.";
+                        errorDiv.style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    errorDiv.innerText = "Connection error. Please try again.";
+                    errorDiv.style.display = 'block';
+                });
+            });
+
+            // Check face match status every 500ms
+            setInterval(() => {
+                fetch('/check_face').then(response => response.json()).then(data => {
+                    const proceedBtn = document.getElementById('proceed-btn');
+                    if (proceedBtn) proceedBtn.disabled = !data.match;
+                });
+            }, 500);
+
+            // Redirect on Proceed button click
+            document.getElementById('proceed-btn').addEventListener('click', () => {
+                window.location.href = "/voting-page";
+            });
+        });
+    </script>
+</body>
+</html>
