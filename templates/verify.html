@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeshGarv - Voter Verification</title>
+    <meta name="description" content="Verify your identity using Aadhaar, OTP, and AI face recognition to cast your vote securely on the DeshGarv E-Voting Portal.">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images__1_-removebg-preview.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        /* Verification Card Styles */
+        .verification-card {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            margin: 40px auto;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            border-top: 5px solid #222674;
+            transition: all 0.3s ease;
+        }
+
+        .main-section.high-contrast .verification-card {
+            background-color: black !important;
+            border: 2px solid yellow !important;
+            color: yellow !important;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .main-section.high-contrast .form-group label {
+            color: yellow !important;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            font-size: 1.1em;
+            box-sizing: border-box;
+            text-align: center;
+            letter-spacing: 2px;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #222674;
+            outline: none;
+        }
+
+        #successMessage {
+            display: none;
+            color: #1b5e20;
+            background-color: #e8f5e9;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-weight: bold;
+            border: 1px solid #c8e6c9;
+        }
+
+        #successMessage.visible {
+            display: block;
+        }
+
+        .main-section.high-contrast #successMessage {
+            background-color: black !important;
+            color: yellow !important;
+            border: 1px solid yellow !important;
+        }
+
+        .alert-error {
+            color: #b71c1c;
+            background-color: #ffebee;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-weight: bold;
+            border: 1px solid #ffcdd2;
+            display: none;
+        }
+
+        .main-section.high-contrast .alert-error {
+            background-color: black !important;
+            color: red !important;
+            border: 1px solid red !important;
+        }
+
+        #otp-input {
+            display: none;
+            margin: 10px auto;
+        }
+        #verifyOtpBtn {
+            margin: 10px auto;
+            background-color: #222674;
+            color: white;
+        }
+        #sendOtpBtn {
+            background-color: #ff9800;
+            color: black;
+            font-weight: bold;
+            margin: 0 auto;
+        }
+        #proceed-btn {
+            background-color: #2e7d32;
+            color: white;
+            font-weight: bold;
+            width: 100%;
+            height: 45px;
+            margin-top: 20px;
+        }
+        #proceed-btn:disabled {
+            background-color: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+        }
+        .main-section.high-contrast #proceed-btn {
+            background-color: yellow !important;
+            color: black !important;
+        }
+        .main-section.high-contrast #proceed-btn:disabled {
+            background-color: #333333 !important;
+            color: #888888 !important;
+            border: 1px solid #555555 !important;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        .verify-header {
+            text-align: center;
+            margin: 30px auto 10px;
+            color: #222674;
+        }
+        .verify-header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+        .verify-header p {
+            font-size: 1.1em;
+            color: #555;
+        }
+        .main-section.high-contrast .verify-header h1,
+        .main-section.high-contrast .verify-header p {
+            color: yellow !important;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #222674;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.95em;
+            margin: 20px auto;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+        .back-link:hover {
+            background-color: rgba(34, 38, 116, 0.08);
+        }
+        .main-section.high-contrast .back-link {
+            color: yellow !important;
+        }
+
+        /* Audio link styling */
+        .audio-instructions {
+            text-align: center;
+            margin: 10px auto 20px;
+        }
+        .audio-instructions a {
+            color: #34495e;
+            text-decoration: underline;
+            font-weight: bold;
+            font-size: 1.05em;
+        }
+        .audio-instructions a:hover {
+            color: #2980b9;
+        }
+        .main-section.high-contrast .audio-instructions a {
+            color: yellow !important;
+        }
+
+        /* ---- live camera (browser webcam) ---- */
+        .camera-box { position: relative; max-width: 480px; margin: 0 auto; border: 3px solid #222674;
+                      border-radius: 8px; overflow: hidden; background: #000; min-height: 200px; }
+        .camera-box video { width: 100%; height: auto; display: block; transform: scaleX(-1); }
+        .face-status { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 12px; text-align: center;
+                       font-weight: bold; color: #fff; background: rgba(0,0,0,.65); }
+        .face-status.ok { background: rgba(27,94,32,.92); }
+        .face-status.error { background: rgba(183,28,28,.92); }
+        .face-status.warn { background: rgba(230,126,0,.92); }
+        .face-progress { max-width: 480px; height: 8px; margin: 10px auto 0; background: #ddd; border-radius: 4px; overflow: hidden; }
+        #face-progress-bar { height: 100%; width: 0; background: #4caf50; transition: width .3s; }
+        .face-hint { font-size: .85em; color: #666; text-align: center; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+    <!-- NAV BAR -->
+    <nav class="navbar">
+        <div class="navbar-logo">
+            <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" class="logo" alt="DeshGarv Logo">
+            <div>
+                <div class="navbar-title" style="color: #ff9800;">देशगर्व / DESHGARV</div>
+                <div class="navbar-subtitle" style="color: white;">National E-Voting Portal</div>
+            </div>
+        </div>
+        <div class="navbar-buttons">
+            <button class="button" onclick="location.href='/'">
+                <span class="material-icons">home</span>
+                Home
+            </button>
+
+            <div id="google_translate_element"></div>
+
+            <!-- Accessibility dropdown -->
+            <div class="dropdown">
+                <button class="button dropdown-toggle" data-dropdown="assist-dropdown">
+                    <span class="material-icons">accessibility</span>
+                </button>
+                <ul class="dropdown-menu" id="assist-dropdown">
+                    <li id="increase-size">A+</li>
+                    <li id="reset-size">A</li>
+                    <li id="decrease-size">A-</li>
+                    <li style="color: #FFFF00; background-color: #000000; text-decoration: underline;" class="high-contrast" id="high-contrast">A</li>
+                </ul>
+            </div>
+
+            <button class="button" onclick="location.href='/register'" style="background-color: #ff9800; color: black; font-weight: bold;">
+                <span class="material-icons">how_to_reg</span>
+                Register
+            </button>
+            <button class="button login-button" onclick="location.href='/admin'">Admin Login</button>
+        </div>
+    </nav>
+
+    <div class="main-section">
+        <!-- Background Image -->
+        <div class="background">
+            <img src="{{ url_for('static', filename='abstract-wavy-indian-flag-design_1055-9791-try.jpg') }}" style="opacity: 0.3;" alt="Background" class="background-image"/>
+        </div>
+
+        <!-- Back Link -->
+        <div style="text-align: center; margin-top: 10px;">
+            <a href="/" class="back-link">
+                <span class="material-icons" style="font-size: 1.2em;">arrow_back</span>
+                Back to Homepage
+            </a>
+        </div>
+
+        <!-- Page Header -->
+        <div class="verify-header">
+            <h1>Voter Verification Center</h1>
+            <p>Complete the 3-step verification process to cast your vote securely.</p>
+        </div>
+
+        <!-- Audio Instructions -->
+        <div class="audio-instructions">
+            <a href="#" onclick="speakInstructions(); return false;">🔊 Listen to Audio Instructions (Text-to-Speech)</a>
+        </div>
+
+        <!-- Voter Verification Card -->
+        <div class="verification-card">
+            <h2>Step 1: Aadhaar Authentication</h2>
+            <p>Enter your 12-digit Aadhaar number to receive a one-time password on your registered mobile.</p>
+
+            <div id="error-message" class="alert-error"></div>
+
+            <!-- Aadhaar Input Section -->
+            <div id="aadhaar-section">
+                <div class="form-group">
+                    <label for="aadhaar-input">Aadhaar Card Number:</label>
+                    <input type="text" id="aadhaar-input" class="form-input" placeholder="Enter 12-digit number" maxlength="12">
+                </div>
+                <button id="sendOtpBtn" class="button">Send OTP</button>
+            </div>
+
+            <!-- Firebase mode: voter types their registered mobile; Firebase texts the code -->
+            <div id="phone-section" style="display: none; margin-top: 15px;">
+                <p id="phone-hint" style="font-size: 0.95em; color: #555;"></p>
+                <div class="form-group">
+                    <label for="phone-input">Registered mobile number:</label>
+                    <input type="text" id="phone-input" class="form-input" placeholder="10-digit mobile number" maxlength="10" inputmode="numeric" autocomplete="tel-national">
+                </div>
+                <button id="sendCodeBtn" class="button">Send verification code</button>
+            </div>
+            <div id="recaptcha-container"></div>
+
+            <!-- OTP Input Section -->
+            <div id="otp-section">
+                <div id="successMessage">OTP Sent!</div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <input type="text" id="otp-input" class="form-input" placeholder="Enter 6-digit OTP" maxlength="6">
+                </div>
+                <button id="verifyOtpBtn" class="button" style="display: none;">Verify OTP</button>
+            </div>
+
+            <!-- Facial Verification Section -->
+            <div id="face-section" style="display: none; margin-top: 20px;">
+                <h3 id="face-title" style="color: #222674;">Step 3: AI Face Match Scan</h3>
+                <p style="font-size: 0.95em; color: #555; margin-bottom: 15px;">Allow camera access and look straight at the camera. You must be alone in the frame. Your face is matched against the photo you registered with, then you will be asked to turn your head a few times to prove you are a real person.</p>
+                <div class="camera-box">
+                    <video id="camera-feed" autoplay playsinline muted></video>
+                    <div id="face-status" class="face-status" role="status" aria-live="polite">Starting camera…</div>
+                </div>
+                <div class="face-progress"><div id="face-progress-bar"></div></div>
+                <p class="face-hint" id="face-debug" style="display: none; font-family: monospace; color: #888;"></p>
+                <p class="face-hint" id="face-hint">Hold still until the bar is full. Good lighting helps.</p>
+                <canvas id="capture-canvas" style="display: none;"></canvas>
+                <button id="proceed-btn" class="button" disabled>Proceed to Vote</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-container">
+                <div class="footer-left">
+                    <img src="{{ url_for('static', filename='Screenshot 2025-01-27 200724.png') }}" style="width: 200px;" alt="ECI Logo" class="eci-logo">
+                    <p>
+                        The Election Commission of India is an autonomous constitutional authority responsible
+                        for administering election processes in India. The body administers elections to the Lok Sabha,
+                        Rajya Sabha, State Legislative Assemblies in India, and the offices of the President and
+                        Vice President in the country.
+                    </p>
+                    <p>📍 Nirvachan Sadan, Ashoka Road, New Delhi 110001</p>
+                </div>
+                <div class="footer-center">
+                    <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" alt="Election Banner" class="election-banner">
+                </div>
+                <div class="footer-right">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="https://www.eci.gov.in/about-eci" target="_blank" rel="noopener">About ECI</a></li>
+                        <li><a href="#">Contact Us</a></li>
+                        <li><a href="#">Public Grievance</a></li>
+                        <li><a href="https://www.eci.gov.in/" target="_blank" rel="noopener">eOffice</a></li>
+                        <li><a href="https://voterportal.eci.gov.in/" target="_blank" rel="noopener">Apply for Voter Card</a></li>
+                        <li><a href="https://voterportal.eci.gov.in/download-e-epic-test" target="_blank" rel="noopener">Download EPIC Card</a></li>
+                        <li><a href="https://www.eci.gov.in/cvigil-app" target="_blank" rel="noopener">Download cVIGIL</a></li>
+                        <li><a href="https://www.eci.gov.in/affidavit-portal" target="_blank" rel="noopener">Candidate Affidavits</a></li>
+                        <li><a href="https://apaar.education.gov.in/" target="_blank" rel="noopener">APAR</a></li>
+                    </ul>
+                </div>
+                <div class="footer-apps">
+                    <h3>ECI Apps Links</h3>
+                    <div class="app-icons">
+                        <img src="{{ url_for('static', filename='Screenshot_2025-01-25_220324-removebg-preview.png') }}" alt="Voter App">
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                &copy; 2026 Election Commission of India. All rights reserved. DeshGarv E-Voting System.
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='homepage.js') }}" defer></script>
+    {% if otp_mode == 'firebase' %}<script src="{{ url_for('static', filename='firebase_otp.js') }}"></script>{% endif %}
+    <script>
+        // Text-to-speech instructions
+        function speakInstructions() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const text = "Welcome to the DeshGarv Voter Verification Center. Step 1: Enter your twelve-digit Aadhaar card number and click Send O.T.P. Step 2: Enter the received six-digit O.T.P. and click Verify. Step 3: Position yourself in front of the webcam for face recognition. Then follow the spoken instructions to slowly turn your head left and right, which proves you are a real person. Once complete, click Proceed to Vote to choose your candidate. Make sure you are in a well-lit room and alone.";
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-IN';
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Text-to-speech is not supported in your browser.");
+            }
+        }
+
+        const FIREBASE_CONFIG = {{ firebase_config|tojson }};   // public web config, or null when not using Firebase
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const $ = (id) => document.getElementById(id);
+            let firebaseMode = false, firebaseReady = false;
+            const aadhaarInput = $('aadhaar-input'), otpInput = $('otp-input');
+            const errorDiv = $('error-message'), successDiv = $('successMessage');
+            const faceSection = $('face-section'), video = $('camera-feed'), canvas = $('capture-canvas');
+            const statusEl = $('face-status'), bar = $('face-progress-bar'), proceedBtn = $('proceed-btn');
+            let stream = null, timer = null, inFlight = false, finished = false, mode = 'face', lastSpoken = '';
+
+            const showError = (msg) => { errorDiv.textContent = msg; errorDiv.style.display = 'block'; };
+            const clearError = () => { errorDiv.style.display = 'none'; };
+
+            async function postJSON(url, body) {
+                const res = await fetch(url, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                return res.json();
+            }
+
+            // ---------- Step 1: send OTP ----------
+            $('sendOtpBtn').addEventListener('click', async () => {
+                clearError();
+                const aadhaar = aadhaarInput.value.trim();
+                if (!/^[0-9]{12}$/.test(aadhaar)) { return showError('Please enter a valid 12-digit Aadhaar number.'); }
+                try {
+                    const data = await postJSON('/send_otp', { aadhaar });
+                    if (!data.success) { return showError(data.message || 'Aadhaar lookup failed.'); }
+                    if (data.mode === 'firebase') {          // Firebase will text the code from the browser
+                        firebaseMode = true;
+                        aadhaarInput.readOnly = true;
+                        $('sendOtpBtn').style.display = 'none';
+                        $('phone-hint').textContent = 'Your registered mobile number looks like ' + data.phone_hint +
+                            '. Type the full number to receive a verification code.';
+                        $('phone-section').style.display = 'block';
+                        document.querySelector('.verification-card h2').textContent = 'Step 2: Mobile Verification';
+                        return;
+                    }
+                    successDiv.textContent = 'OTP sent to your registered mobile number.';
+                    if (data.otp) {   // only present when the server runs in demo mode
+                        const line = document.createElement('div');
+                        line.append('Demo mode - your code is: ');
+                        const code = document.createElement('strong');
+                        code.style.cssText = 'font-size:1.2em; color:#d81b60;';
+                        code.textContent = data.otp;
+                        line.append(code);
+                        successDiv.append(line);
+                    }
+                    successDiv.classList.add('visible');
+                    otpInput.style.display = 'block';
+                    $('verifyOtpBtn').style.display = 'block';
+                    document.querySelector('.verification-card h2').textContent = 'Step 2: OTP Verification';
+                } catch (err) { showError('Connection error. Please try again.'); }
+            });
+
+            // ---------- Step 2 (Firebase only): send the code ----------
+            $('sendCodeBtn').addEventListener('click', async () => {
+                clearError();
+                const phone = $('phone-input').value.trim();
+                if (!/^[6-9][0-9]{9}$/.test(phone)) { return showError('Please enter your 10-digit registered mobile number.'); }
+                const btn = $('sendCodeBtn'); btn.disabled = true;
+                try {
+                    if (!firebaseReady) { await window.FirebaseOtp.init(FIREBASE_CONFIG); firebaseReady = true; }
+                    await window.FirebaseOtp.sendCode(phone, 'recaptcha-container');
+                    successDiv.textContent = 'Verification code sent to +91 ' + phone.slice(0, 2) + 'XXXXXX' + phone.slice(-2) + '.';
+                    successDiv.classList.add('visible');
+                    otpInput.style.display = 'block';
+                    $('verifyOtpBtn').style.display = 'block';
+                    btn.textContent = 'Resend code';
+                } catch (err) { showError(window.FirebaseOtp.describeError(err)); }
+                btn.disabled = false;
+            });
+
+            // ---------- Step 2: verify OTP, then start the camera ----------
+            $('verifyOtpBtn').addEventListener('click', async () => {
+                clearError();
+                const otp = otpInput.value.trim();
+                if (!/^[0-9]{6}$/.test(otp)) { return showError('Please enter a valid 6-digit OTP.'); }
+                let payload;
+                try {
+                    payload = firebaseMode
+                        ? { aadhaar: aadhaarInput.value.trim(), id_token: await window.FirebaseOtp.confirmCode(otp) }
+                        : { aadhaar: aadhaarInput.value.trim(), otp };
+                } catch (err) { return showError(window.FirebaseOtp.describeError(err)); }
+                try {
+                    const data = await postJSON('/verify_otp', payload);
+                    if (!data.success) { return showError(data.message || 'OTP verification failed.'); }
+                    $('aadhaar-section').style.display = 'none';
+                    $('otp-section').style.display = 'none';
+                    document.querySelector('.verification-card h2').textContent = 'Step 3: Face Verification';
+                    faceSection.style.display = 'block';
+                    startCamera();
+                } catch (err) { showError('Connection error. Please try again.'); }
+            });
+
+            // ---------- Step 3: live face match (frames are judged by the SERVER) ----------
+            function setStatus(text, kind) { statusEl.textContent = text; statusEl.className = 'face-status ' + (kind || ''); }
+
+            function stopCamera() {
+                clearInterval(timer);
+                if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+            }
+
+            async function startCamera() {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    return setStatus('This browser cannot use the camera. Use HTTPS (or localhost) and a modern browser.', 'error');
+                }
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
+                    });
+                    video.srcObject = stream;
+                    await video.play();
+                    setStatus('Look straight at the camera…', '');
+                    timer = setInterval(sendFrame, 700);
+                } catch (err) {
+                    setStatus('Camera access was blocked. Allow the camera for this site, then reload.', 'error');
+                }
+            }
+
+            function restartAfter(msg) {
+                finished = true; stopCamera(); setStatus(msg, 'error');
+                setTimeout(() => window.location.reload(), 3500);
+            }
+
+            function speak(text) {          // read each new instruction aloud (accessibility)
+                if (text === lastSpoken || !('speechSynthesis' in window)) { return; }
+                lastSpoken = text;
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text.replace(/[⬅➡✓✗]/g, '')); u.lang = 'en-IN';
+                window.speechSynthesis.speak(u);
+            }
+
+            function finishAll() {
+                finished = true; stopCamera();
+                bar.style.width = '100%';
+                setStatus(mode === 'liveness' ? '✓ Verified: identity and liveness confirmed.' : '✓ MATCH! Identity confirmed.', 'ok');
+                proceedBtn.disabled = false;
+            }
+
+            async function beginLiveness(notice) {
+                mode = 'liveness'; lastSpoken = '';
+                $('face-title').textContent = 'Step 4: Liveness Check';
+                $('face-hint').textContent = 'Turn your head slowly when asked, then face the camera again. The preview is mirrored: "left" means towards the left of the screen.';
+                bar.style.width = '0%';
+                try {
+                    const res = await fetch('/liveness/start', { method: 'POST' });
+                    const data = await res.json();
+                    if (!data.success) { return restartAfter(data.message); }
+                    if (data.required === false || data.verified) { return finishAll(); }
+                    const base = 'Look straight at the camera and hold still…';
+                    const msg = notice ? notice + ' ' + base.charAt(0).toLowerCase() + base.slice(1) : base;
+                    setStatus(msg, notice ? 'ok' : '');
+                    speak(msg);
+                } catch (err) { setStatus('Connection problem - retrying…', 'warn'); }
+            }
+
+            const LIVE_TEXT = {
+                calibrating: 'Look straight at the camera and hold still…',
+                recalibrate: 'Hold your head still, looking straight ahead…',
+                holding: 'Good - hold it there…',
+                step_done: '✓ Good! Now face the camera straight on',
+                return_center: 'Face the camera straight on',
+                no_face: 'No face detected - keep your whole face in view and turn slowly',
+                multiple_faces: '✗ ONLY 1 PERSON ALLOWED IN FRAME',
+                no_match: '✗ NO MATCH - keep your own face fully in view',
+                busy: 'One moment…'
+            };
+
+            async function handleLiveness(data) {
+                if (data.verified) { return finishAll(); }
+                if (data.status === 'challenge_failed') {
+                    if (data.can_retry) { return beginLiveness('Time ran out - here is a new challenge:'); }
+                    setStatus('Time ran out.', 'warn');
+                    return restartAfter('Too many liveness attempts. Please start again.');
+                }
+                const done = Math.max(0, data.step - 1) + (data.direction ? data.hold / data.hold_needed : 0);
+                bar.style.width = (data.phase === 'calibrate' ? 0 : Math.min(100, (done / data.total) * 100)) + '%';
+                let msg = LIVE_TEXT[data.status];
+                if (data.direction && ['turn', 'wrong_way', 'holding'].includes(data.status)) {
+                    const d = data.direction.toUpperCase();
+                    msg = data.status === 'holding' ? LIVE_TEXT.holding
+                        : (data.status === 'wrong_way' ? 'Other way! ' : '') + (data.direction === 'left' ? '⬅ ' : '➡ ')
+                          + 'Slowly turn your head to YOUR ' + d + '  (' + data.step + '/' + data.total + ')';
+                }
+                msg = msg || '…';
+                const dbg = $('face-debug');                      // only sent by the server in demo mode
+                if (data.yaw !== undefined) {
+                    dbg.style.display = 'block';
+                    dbg.textContent = 'yaw ' + data.yaw + (data.dist !== undefined ? '  |  identity distance ' + data.dist + ' (limit ' + data.limit + ')' : '');
+                }
+                const kind = ['holding', 'step_done'].includes(data.status) ? 'ok'
+                    : (['no_face', 'recalibrate', 'calibrating', 'busy'].includes(data.status) ? 'warn'
+                    : (['multiple_faces', 'no_match', 'wrong_way'].includes(data.status) ? 'error' : ''));
+                setStatus(msg, kind);
+                if (data.status !== 'holding') { speak(msg); }
+            }
+
+            async function sendFrame() {
+                if (inFlight || finished || !video.videoWidth) { return; }
+                inFlight = true;
+                try {
+                    const w = Math.min(480, video.videoWidth);
+                    canvas.width = w; canvas.height = Math.round(video.videoHeight * w / video.videoWidth);
+                    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.85));
+                    const fd = new FormData(); fd.append('frame', blob, 'frame.jpg');
+                    const res = await fetch(mode === 'face' ? '/verify_face' : '/liveness/frame', { method: 'POST', body: fd });
+                    const data = await res.json();
+
+                    if (res.status === 401 || res.status === 429) { return restartAfter(data.message); }
+                    if (res.status === 503) { finished = true; stopCamera(); return setStatus(data.message, 'error'); }
+                    if (!data.success) { return setStatus(data.message || 'Could not check this frame.', 'warn'); }
+
+                    if (mode === 'liveness') { return handleLiveness(data); }
+                    bar.style.width = Math.min(100, (data.streak / data.required) * 100) + '%';
+                    if (data.verified) {
+                        if (data.liveness_required) {      // identity OK -> now prove it is a live person
+                            return beginLiveness('✓ Face matched. Liveness check:');
+                        }
+                        return finishAll();
+                    }
+                    const msg = {
+                        match: 'Match - hold still… (' + data.streak + '/' + data.required + ')',
+                        no_match: '✗ NO MATCH - this does not look like the registered voter',
+                        multiple_faces: '✗ ONLY 1 PERSON ALLOWED IN FRAME',
+                        no_face: 'No face detected - look at the camera'
+                    }[data.status] || '…';
+                    setStatus(msg, data.status === 'match' ? 'ok' : (data.status === 'no_face' ? 'warn' : 'error'));
+                } catch (err) {
+                    setStatus('Connection problem - retrying…', 'warn');
+                } finally { inFlight = false; }
+            }
+
+            proceedBtn.addEventListener('click', () => { window.location.href = '/voting-page'; });
+            window.addEventListener('beforeunload', stopCamera);
+        });
+    </script>
+</body>
+</html>

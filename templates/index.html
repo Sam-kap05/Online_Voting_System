@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeshGarv - National E-Voting Portal</title>
+    <meta name="description" content="DeshGarv - Secure online e-voting platform by the Election Commission of India. Cast your vote securely using Aadhaar verification and AI face recognition.">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images__1_-removebg-preview.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        html {
+            font-size: 16px;
+        }
+        .board-caption {
+            max-width: 800px;
+            margin: 5px auto 20px;
+            font-size: 0.9em;
+            color: #555;
+            text-align: center;
+            line-height: 1.5;
+        }
+        .main-section.high-contrast .board-caption {
+            color: yellow !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAV BAR (matching original layout) -->
+    <nav class="navbar">
+        <!-- Logo -->
+        <div class="navbar-logo">
+            <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" class="logo" alt="DeshGarv Logo">
+            <div>
+                <div class="navbar-title" style="color: #ff9800;">देशगर्व / DESHGARV</div>
+                <div class="navbar-subtitle" style="color: white;">National E-Voting Portal</div>
+            </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="navbar-buttons">
+            <button class="button" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+                <span class="material-icons">home</span>
+                Home
+            </button>
+            <button class="button" id="skip_button">Skip to Main</button>
+
+            <div id="google_translate_element"></div>
+
+            <!-- Accessibility dropdown (matching original) -->
+            <div class="dropdown">
+                <button class="button dropdown-toggle" data-dropdown="assist-dropdown">
+                    <span class="material-icons">accessibility</span>
+                </button>
+                <ul class="dropdown-menu" id="assist-dropdown">
+                    <li id="increase-size">A+</li>
+                    <li id="reset-size">A</li>
+                    <li id="decrease-size">A-</li>
+                    <li style="color: #FFFF00; background-color: #000000; text-decoration: underline;" class="high-contrast" id="high-contrast">A</li>
+                </ul>
+            </div>
+
+            <!-- Register Button -->
+            <button class="button" onclick="location.href='/register'" style="background-color: #ff9800; color: black; font-weight: bold;">
+                <span class="material-icons">how_to_reg</span>
+                Register
+            </button>
+
+            <!-- Admin Login Button -->
+            <button class="button login-button" onclick="location.href='/admin'">Admin Login</button>
+        </div>
+    </nav>
+
+    <div class="main-section">
+        <!-- Background Image -->
+        <div class="background">
+            <img src="{{ url_for('static', filename='abstract-wavy-indian-flag-design_1055-9791-try.jpg') }}" style="opacity: 0.3;" alt="Background" class="background-image"/>
+        </div>
+
+        <!-- Note from ECI + Steps to Vote (side by side, matching original) -->
+        <div class="info-container">
+            <div class="note-section">
+                <h2>Note from the Election Commission of India</h2>
+                <p>
+                    "The Election Commission of India is proud to introduce a secure and advanced e-voting platform to revolutionize the voting process in our country. This initiative aims to empower every eligible citizen to vote with ease and confidence, ensuring inclusivity, transparency, and modernization of democratic practices. By leveraging technology, we strive to make voting more accessible, secure, and engaging for all. Together, let us build a future where every voice is heard and every vote matters."
+                </p>
+            </div>
+            <div class="steps-to-vote">
+                <img src="{{ url_for('static', filename='White and Blue Professional Modern Technology Pitch Deck Presentation (1).jpg') }}" alt="Steps to Vote Online" />
+            </div>
+        </div>
+
+        <!-- Key Features Section (new content for richer page) -->
+        <div class="features-section">
+            <h2 class="features-title">Why Vote with DeshGarv?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="material-icons feature-icon">security</span>
+                    <h3>End-to-End Encryption</h3>
+                    <p>All votes are secured with SHA-256 cryptographic hashing and tamper-proof audit logs for complete election integrity.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="material-icons feature-icon">face</span>
+                    <h3>AI Face Recognition</h3>
+                    <p>DeepFace-powered identity verification ensures only the registered voter can cast their ballot. Multiple faces are auto-flagged.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="material-icons feature-icon">accessibility</span>
+                    <h3>Fully Accessible</h3>
+                    <p>Text-to-speech, high contrast mode, font scaling, and multi-language support for inclusive and barrier-free voting.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="material-icons feature-icon">verified_user</span>
+                    <h3>Aadhaar + OTP Verification</h3>
+                    <p>Two-factor authentication using your Aadhaar number and a one-time password sent to your registered mobile number.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Instructions Link -->
+        <div class="video-link">
+            <a href="#" onclick="speakInstructions(); return false;">🔊 Listen to Audio Instructions (Text-to-Speech)</a>
+        </div>
+
+        <!-- Link to Video Demonstration -->
+        <div class="video-link">
+            <a href="https://www.youtube.com" target="_blank">LINK TO VIDEO DEMONSTRATION</a>
+        </div>
+
+        <!-- Board of Members Image -->
+        <div class="board-members">
+            <div class="board-image-container" style="margin-bottom: 0;">
+                <img src="{{ url_for('static', filename='MivlTMWyqfszHFA1736326155 (1).jpg') }}" alt="Board Members - ECI" />
+            </div>
+            <div class="board-text">Board of members - ECI</div>
+            <p class="board-caption">
+                Shri Rajiv Kumar (Chief Election Commissioner) &bull;
+                Shri Gyanesh Kumar (Election Commissioner) &bull;
+                Shri Sukhbir Singh Sandhu (Election Commissioner)
+            </p>
+        </div>
+
+        <!-- Click to Cast Vote Section (navigates to separate verification page) -->
+        <div id="main_content" class="cast-vote">
+            <button class="vote-button" onclick="location.href='/verify'">
+                <img src="{{ url_for('static', filename='pngtree-election-vote-button-with-hand-png-image_9159293.png') }}" alt="Vote Icon" />
+                CLICK TO CAST VOTE
+            </button>
+        </div>
+
+        <!-- Footer (matching original 4-column layout) -->
+        <footer class="footer">
+            <div class="footer-container">
+                <!-- Left Section: ECI Info & Image -->
+                <div class="footer-left">
+                    <img src="{{ url_for('static', filename='Screenshot 2025-01-27 200724.png') }}" style="width: 200px;" alt="ECI Logo" class="eci-logo">
+                    <p>
+                        The Election Commission of India is an autonomous constitutional authority responsible
+                        for administering election processes in India. The body administers elections to the Lok Sabha,
+                        Rajya Sabha, State Legislative Assemblies in India, and the offices of the President and
+                        Vice President in the country.
+                    </p>
+                    <p>📍 Nirvachan Sadan, Ashoka Road, New Delhi 110001</p>
+                </div>
+
+                <!-- Center Section: Election Banner -->
+                <div class="footer-center">
+                    <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" alt="Election Banner" class="election-banner">
+                </div>
+
+                <!-- Right Section: Quick Links -->
+                <div class="footer-right">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="https://www.eci.gov.in/about-eci" target="_blank" rel="noopener">About ECI</a></li>
+                        <li><a href="#">Contact Us</a></li>
+                        <li><a href="#">Public Grievance</a></li>
+                        <li><a href="https://www.eci.gov.in/" target="_blank" rel="noopener">eOffice</a></li>
+                        <li><a href="https://voterportal.eci.gov.in/" target="_blank" rel="noopener">Apply for Voter Card</a></li>
+                        <li><a href="https://voterportal.eci.gov.in/download-e-epic-test" target="_blank" rel="noopener">Download EPIC Card</a></li>
+                        <li><a href="https://www.eci.gov.in/cvigil-app" target="_blank" rel="noopener">Download cVIGIL</a></li>
+                        <li><a href="https://www.eci.gov.in/affidavit-portal" target="_blank" rel="noopener">Candidate Affidavits</a></li>
+                        <li><a href="https://apaar.education.gov.in/" target="_blank" rel="noopener">APAR</a></li>
+                    </ul>
+                </div>
+
+                <!-- Apps Links -->
+                <div class="footer-apps">
+                    <h3>ECI Apps Links</h3>
+                    <div class="app-icons">
+                        <img src="{{ url_for('static', filename='Screenshot_2025-01-25_220324-removebg-preview.png') }}" alt="Voter App">
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                &copy; 2026 Election Commission of India. All rights reserved. DeshGarv E-Voting System.
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='homepage.js') }}" defer></script>
+    <script>
+        // Text-to-speech instructions
+        function speakInstructions() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const text = "Welcome to the DeshGarv E-Voting Portal. To cast your vote online, click the Cast Vote button. You will enter your twelve-digit Aadhaar card number, verify with a one-time password, and complete face recognition. Make sure you are in a well-lit room and alone.";
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-IN';
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Text-to-speech is not supported in your browser.");
+            }
+        }
+    </script>
+</body>
+</html>

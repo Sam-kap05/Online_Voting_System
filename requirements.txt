@@ -1,0 +1,25 @@
+# Web app
+flask>=3.0,<4
+pillow>=10
+numpy>=1.26
+
+# Face recognition.
+# IMPORTANT: opencv-python 5.x ships WITHOUT the Haar cascade files that DeepFace's
+# default "opencv" detector needs, so face detection breaks. Stay on 4.x.
+opencv-python>=4.9,<5
+deepface>=0.0.93
+tf-keras
+retina-face>=0.0.17   # landmarks for liveness (also pulled in by deepface)
+
+# Production server (optional):  gunicorn -w 1 --threads 4 "app:create_app()"
+gunicorn>=22
+
+# Firebase phone-OTP: verifies Firebase ID tokens on the server
+PyJWT>=2.8
+cryptography>=42
+
+# Reads settings from an optional .env file
+python-dotenv>=1.0
+
+# Tests
+pytest>=8

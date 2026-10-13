@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeshGarv - Voter Registration</title>
+    <meta name="description" content="Register as a new voter on the DeshGarv E-Voting Portal. Complete your Aadhaar-based registration to participate in secure online elections.">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images__1_-removebg-preview.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .register-page {
+            max-width: 650px;
+            margin: 30px auto 50px;
+            padding: 0 20px;
+        }
+
+        .register-card {
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 14px;
+            padding: 40px 35px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
+            border-top: 6px solid #222674;
+            animation: slideUp 0.4s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .register-header h1 {
+            color: #222674;
+            font-size: 1.7em;
+            margin: 0 0 5px;
+        }
+
+        .register-header p {
+            color: #666;
+            font-size: 0.95em;
+            margin: 0;
+        }
+
+        .reg-form-group {
+            margin-bottom: 22px;
+        }
+
+        .reg-form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #333;
+            font-size: 0.95em;
+        }
+
+        .reg-form-group label .required {
+            color: #b71c1c;
+        }
+
+        .reg-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+            background: #fafafa;
+        }
+
+        .reg-input:focus {
+            border-color: #222674;
+            outline: none;
+            background: white;
+        }
+
+        .reg-select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+            background: #fafafa;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .reg-select:focus {
+            border-color: #222674;
+            outline: none;
+        }
+
+        .photo-upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+            position: relative;
+        }
+
+        .photo-upload-area:hover {
+            border-color: #222674;
+            background: #f0f0ff;
+        }
+
+        .photo-upload-area.has-file {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+
+        .photo-upload-area .material-icons {
+            font-size: 3em;
+            color: #999;
+            margin-bottom: 8px;
+        }
+
+        .photo-upload-area.has-file .material-icons {
+            color: #4caf50;
+        }
+
+        .photo-upload-area p {
+            margin: 0;
+            color: #777;
+            font-size: 0.95em;
+        }
+
+        .photo-upload-area .file-name {
+            color: #222674;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        #photo-input {
+            display: none;
+        }
+
+        .photo-preview {
+            display: none;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 10px auto 0;
+            border: 3px solid #4caf50;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .photo-preview.visible {
+            display: block;
+        }
+
+        .reg-error {
+            display: none;
+            color: #b71c1c;
+            background-color: #ffebee;
+            padding: 12px 14px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+            border: 1px solid #ffcdd2;
+        }
+
+        .reg-error.visible {
+            display: block;
+        }
+
+        .reg-success {
+            display: none;
+            color: #1b5e20;
+            background-color: #e8f5e9;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 0.95em;
+            border: 1px solid #c8e6c9;
+            text-align: center;
+        }
+
+        .reg-success.visible {
+            display: block;
+        }
+
+        .reg-submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: black;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.15em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .reg-submit-btn:hover {
+            background: linear-gradient(135deg, #f57c00, #ef6c00);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+        }
+
+        .reg-submit-btn:disabled {
+            background: #ccc;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .info-note {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 12px 14px;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.88em;
+            color: #333;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        .info-note strong {
+            color: #1976d2;
+        }
+
+        .step-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .step-dot {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .step-dot .dot {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.85em;
+            color: white;
+        }
+
+        .step-dot.active .dot {
+            background: #222674;
+        }
+
+        .step-dot.active {
+            color: #222674;
+            font-weight: bold;
+        }
+
+        .step-dot.done .dot {
+            background: #4caf50;
+        }
+
+        .back-home-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #222674;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-top: 20px;
+            transition: opacity 0.2s;
+        }
+
+        .back-home-link:hover {
+            opacity: 0.7;
+        }
+
+        .reg-footer {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .step-indicators { flex-wrap: wrap; }
+        .cam-panel { display: none; margin-top: 12px; text-align: center; }
+        .cam-panel.visible { display: block; }
+        .cam-panel video { width: 100%; max-width: 360px; border-radius: 10px; background: #000; transform: scaleX(-1); }
+        .link-btn { background: none; border: none; color: #222674; font-weight: bold; cursor: pointer;
+                    text-decoration: underline; font-size: 0.95em; padding: 6px; }
+        .link-btn:disabled { color: #999; text-decoration: none; cursor: not-allowed; }
+        .otp-input { text-align: center; letter-spacing: 8px; font-size: 1.5em; }
+        .demo-otp { background: #fff8e1; border: 1px dashed #ff9800; border-radius: 6px; padding: 8px 12px;
+                    margin-bottom: 15px; font-size: 0.9em; display: none; }
+        .demo-otp.visible { display: block; }
+        .demo-otp strong { color: #d81b60; font-size: 1.2em; letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+
+    <!-- NAV BAR -->
+    <nav class="navbar">
+        <div class="navbar-logo">
+            <img src="{{ url_for('static', filename='deshgarv-logo.png') }}" class="logo" alt="DeshGarv Logo">
+            <div>
+                <div class="navbar-title" style="color: #ff9800;">देशगर्व / DESHGARV</div>
+                <div class="navbar-subtitle" style="color: white;">National E-Voting Portal</div>
+            </div>
+        </div>
+        <div class="navbar-buttons">
+            <button class="button" onclick="location.href='/'">
+                <span class="material-icons">home</span>
+                Home
+            </button>
+            <button class="button login-button" onclick="location.href='/admin'">Admin Login</button>
+        </div>
+    </nav>
+
+    <!-- Background -->
+    <div class="background">
+        <img src="{{ url_for('static', filename='abstract-wavy-indian-flag-design_1055-9791-try.jpg') }}" style="opacity: 0.3;" alt="Background" class="background-image"/>
+    </div>
+
+    <!-- Registration Form -->
+    <div class="register-page">
+        <div class="register-card">
+            <div class="register-header">
+                <h1><span class="material-icons" style="font-size: 1em; vertical-align: middle; margin-right: 6px;">how_to_reg</span> New Voter Registration</h1>
+                <p>Register to participate in India's secure online elections</p>
+            </div>
+
+            <div class="step-indicators">
+                <div class="step-dot active" id="step1-dot"><div class="dot">1</div> Details</div>
+                <div class="step-dot" id="step2-dot"><div class="dot">2</div> Photo</div>
+                <div class="step-dot" id="step3-dot"><div class="dot">3</div> Verify mobile</div>
+                <div class="step-dot" id="step4-dot"><div class="dot">4</div> Done</div>
+            </div>
+
+            <div class="info-note">
+                <strong>ℹ️ How it works:</strong> Enter your details and a clear photo of your face. We check the photo contains exactly one face, then send a one-time password (OTP) to your mobile number to confirm it is yours. On voting day your live camera image is matched against this photo.
+                
+            </div>
+
+            <div id="reg-error" class="reg-error" role="alert"></div>
+
+            <!-- Step 1: Personal Details -->
+            <div id="step1-fields">
+                <div class="reg-form-group">
+                    <label for="reg-name">Full Name <span class="required">*</span></label>
+                    <input type="text" id="reg-name" class="reg-input" placeholder="Enter your full name" maxlength="80" autocomplete="name">
+                </div>
+                <div class="reg-form-group">
+                    <label for="reg-aadhaar">Aadhaar Card Number <span class="required">*</span></label>
+                    <input type="text" id="reg-aadhaar" class="reg-input" placeholder="Enter 12-digit Aadhaar number" maxlength="12" inputmode="numeric" autocomplete="off">
+                </div>
+                <div class="reg-form-group">
+                    <label for="reg-phone">Mobile Number <span class="required">*</span></label>
+                    <input type="text" id="reg-phone" class="reg-input" placeholder="10-digit mobile number (OTP will be sent here)" maxlength="10" inputmode="numeric" autocomplete="tel-national">
+                </div>
+                <div class="reg-form-group">
+                    <label for="reg-constituency">Constituency <span class="required">*</span></label>
+                    <select id="reg-constituency" class="reg-select">
+                        <option value="" disabled selected>-- Select your constituency --</option>
+                        {% for c in constituencies %}
+                        <option value="{{ c }}">{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="button" class="reg-submit-btn" id="next-to-photo-btn">
+                    Next: Add Photo <span class="material-icons">arrow_forward</span>
+                </button>
+            </div>
+
+            <!-- Step 2: Photo -->
+            <div id="step2-fields" style="display: none;">
+                <div class="reg-form-group">
+                    <label>Your Face Photo <span class="required">*</span></label>
+                    <p style="font-size: 0.88em; color: #666; margin: 0 0 10px;">Front-facing, well lit, only you in the picture, no sunglasses or mask. This is used to verify you when you vote.</p>
+                    <div class="photo-upload-area" id="photo-drop-area">
+                        <span class="material-icons" id="upload-icon">cloud_upload</span>
+                        <p id="upload-text">Click to upload or drag &amp; drop your photo (JPG / PNG, max 5 MB)</p>
+                        <p class="file-name" id="file-name-display"></p>
+                        <img class="photo-preview" id="photo-preview" alt="Preview of your photo">
+                    </div>
+                    <input type="file" id="photo-input" accept="image/jpeg,image/png">
+                    <div style="text-align: center; margin-top: 8px;">
+                        <button type="button" class="link-btn" id="use-camera-btn">📷 Or take a photo with your camera</button>
+                    </div>
+                    <div class="cam-panel" id="cam-panel">
+                        <video id="cam-video" autoplay playsinline muted></video><br>
+                        <button type="button" class="reg-submit-btn" style="max-width: 260px; margin: 10px auto 0;" id="capture-btn">
+                            <span class="material-icons">photo_camera</span> Capture
+                        </button>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button type="button" class="reg-submit-btn" style="background: #e0e0e0; color: #333; flex: 0.4;" id="back-to-1-btn">
+                        <span class="material-icons">arrow_back</span> Back
+                    </button>
+                    <button type="button" class="reg-submit-btn" id="submit-reg-btn" style="flex: 0.6;">
+                        <span class="material-icons">sms</span> Send OTP
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Mobile OTP -->
+            <div id="step3-fields" style="display: none;">
+                <p id="otp-sent-msg" style="color: #333;"></p>
+                <div class="demo-otp" id="demo-otp">Demo mode - your OTP is <strong id="demo-otp-code"></strong></div>
+                <div class="reg-form-group">
+                    <label for="reg-otp">Enter the 6-digit OTP</label>
+                    <input type="text" id="reg-otp" class="reg-input otp-input" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="••••••">
+                </div>
+                <button type="button" class="reg-submit-btn" id="verify-otp-btn">
+                    <span class="material-icons">verified</span> Verify &amp; Complete Registration
+                </button>
+                <div style="text-align: center; margin-top: 10px;">
+                    <button type="button" class="link-btn" id="resend-btn" disabled>Resend OTP</button>
+                </div>
+            </div>
+
+            <!-- Step 4: Success -->
+            <div id="step4-fields" style="display: none; text-align: center; padding: 20px 0;">
+                <div style="font-size: 4em; color: #4caf50; margin-bottom: 10px;">✓</div>
+                <h2 style="color: #222674; margin: 0 0 10px;">Registration Successful!</h2>
+                <p style="color: #555; font-size: 1.05em;" id="success-detail"></p>
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left; font-family: monospace; font-size: 0.9em;">
+                    <strong>--- YOUR VOTER DETAILS ---</strong><br>
+                    Name: <span id="receipt-name"></span><br>
+                    Aadhaar: <span id="receipt-aadhaar"></span><br>
+                    Mobile: <span id="receipt-phone"></span><br>
+                    Constituency: <span id="receipt-const"></span><br>
+                    Status: <span style="color: #4caf50; font-weight: bold;">REGISTERED ✓</span><br>
+                    <strong>--------------------------</strong>
+                </div>
+                <button type="button" class="reg-submit-btn" onclick="location.href='/verify'">
+                    <span class="material-icons">how_to_vote</span> Go to Voting
+                </button>
+            </div>
+
+            <div class="reg-footer" id="reg-footer-link">
+                <a href="/" class="back-home-link">
+                    <span class="material-icons" style="font-size: 1.1em;">arrow_back</span>
+                    Back to Homepage
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="recaptcha-container"></div>
+    {% if otp_mode == 'firebase' %}<script src="{{ url_for('static', filename='firebase_otp.js') }}"></script>{% endif %}
+    <script>
+        const FIREBASE_CONFIG = {{ firebase_config|tojson }};   // public web config, or null when not using Firebase
+        const $ = (id) => document.getElementById(id);
+        let selectedFile = null, camStream = null, resendTimer = null;
+        let firebaseMode = false, firebaseReady = false, regPhone = '';
+
+        function showError(msg) {
+            const el = $('reg-error');
+            el.textContent = msg;
+            el.classList.add('visible');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        function clearError() { $('reg-error').classList.remove('visible'); }
+
+        function goStep(n) {
+            for (let i = 1; i <= 4; i++) {
+                $('step' + i + '-fields').style.display = (i === n) ? 'block' : 'none';
+                const dot = $('step' + i + '-dot');
+                dot.classList.toggle('active', i === n);
+                dot.classList.toggle('done', i < n || (n === 4 && i === 4));
+            }
+            $('reg-footer-link').style.display = (n === 4) ? 'none' : 'block';
+            if (n !== 2) { stopCamera(); }
+        }
+
+        // ---------- Step 1 ----------
+        $('next-to-photo-btn').addEventListener('click', () => {
+            clearError();
+            const name = $('reg-name').value.trim();
+            if (name.length < 2) { return showError('Please enter your full name.'); }
+            if (!/^[0-9]{12}$/.test($('reg-aadhaar').value.trim())) { return showError('Please enter a valid 12-digit Aadhaar number.'); }
+            if (!/^[6-9][0-9]{9}$/.test($('reg-phone').value.trim())) { return showError('Please enter a valid 10-digit mobile number.'); }
+            if (!$('reg-constituency').value) { return showError('Please select your constituency.'); }
+            goStep(2);
+        });
+        $('back-to-1-btn').addEventListener('click', () => { clearError(); goStep(1); });
+
+        // ---------- Step 2: photo (upload, drag & drop, or camera) ----------
+        const dropArea = $('photo-drop-area'), photoInput = $('photo-input'), previewImg = $('photo-preview');
+
+        function setPhoto(file) {
+            if (!file) { return; }
+            if (!['image/jpeg', 'image/png'].includes(file.type)) { return showError('Please use a JPG or PNG image.'); }
+            if (file.size > 5 * 1024 * 1024) { return showError('Photo must be under 5 MB.'); }
+            clearError();
+            selectedFile = file;
+            $('upload-icon').textContent = 'check_circle';
+            $('upload-text').textContent = 'Photo selected:';
+            $('file-name-display').textContent = file.name;
+            dropArea.classList.add('has-file');
+            const reader = new FileReader();
+            reader.onload = (e) => { previewImg.src = e.target.result; previewImg.classList.add('visible'); };
+            reader.readAsDataURL(file);
+        }
+        dropArea.addEventListener('click', () => photoInput.click());
+        photoInput.addEventListener('change', () => setPhoto(photoInput.files[0]));
+        dropArea.addEventListener('dragover', (e) => { e.preventDefault(); dropArea.style.borderColor = '#222674'; });
+        dropArea.addEventListener('dragleave', () => { dropArea.style.borderColor = ''; });
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault(); dropArea.style.borderColor = '';
+            if (e.dataTransfer.files.length) { setPhoto(e.dataTransfer.files[0]); }
+        });
+
+        async function startCamera() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                return showError('This browser cannot use the camera (HTTPS or localhost is required). Please upload a photo instead.');
+            }
+            try {
+                camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 } }, audio: false });
+                $('cam-video').srcObject = camStream;
+                $('cam-panel').classList.add('visible');
+            } catch (e) { showError('Camera access was blocked. Please upload a photo instead.'); }
+        }
+        function stopCamera() {
+            if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+            $('cam-panel').classList.remove('visible');
+        }
+        $('use-camera-btn').addEventListener('click', startCamera);
+        $('capture-btn').addEventListener('click', () => {
+            const v = $('cam-video');
+            if (!v.videoWidth) { return; }
+            const c = document.createElement('canvas');
+            c.width = v.videoWidth; c.height = v.videoHeight;
+            c.getContext('2d').drawImage(v, 0, 0);
+            c.toBlob((blob) => { setPhoto(new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' })); stopCamera(); }, 'image/jpeg', 0.92);
+        });
+
+        async function postJSON(url, body) {
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+            return res.json();
+        }
+
+        function showOtpStep(data) {
+            $('otp-sent-msg').textContent = data.message;
+            const demo = $('demo-otp');
+            if (data.otp) { $('demo-otp-code').textContent = data.otp; demo.classList.add('visible'); }
+            else { demo.classList.remove('visible'); }
+            $('reg-otp').value = '';
+            goStep(3);
+            startResendCooldown(30);
+        }
+
+        function startResendCooldown(seconds) {
+            const btn = $('resend-btn');
+            clearInterval(resendTimer);
+            let left = seconds;
+            btn.disabled = true; btn.textContent = 'Resend OTP in ' + left + 's';
+            resendTimer = setInterval(() => {
+                left -= 1;
+                if (left <= 0) { clearInterval(resendTimer); btn.disabled = false; btn.textContent = 'Resend OTP'; }
+                else { btn.textContent = 'Resend OTP in ' + left + 's'; }
+            }, 1000);
+        }
+
+        // Firebase mode: ask Firebase (from the browser) to text the code to the number being registered
+        async function startFirebaseOtp(data) {
+            firebaseMode = true; regPhone = data.phone;
+            try {
+                if (!firebaseReady) { await window.FirebaseOtp.init(FIREBASE_CONFIG); firebaseReady = true; }
+                await window.FirebaseOtp.sendCode(regPhone, 'recaptcha-container');
+            } catch (err) { return showError(window.FirebaseOtp.describeError(err)); }
+            showOtpStep({ message: 'We sent a verification code to +91 ' + regPhone.slice(0, 2) + 'XXXXXX' + regPhone.slice(-2) + '.' });
+        }
+
+        // ---------- Step 2 -> server: validate photo + send OTP ----------
+        $('submit-reg-btn').addEventListener('click', async () => {
+            clearError();
+            if (!selectedFile) { return showError('Please upload or capture a face photo.'); }
+            const btn = $('submit-reg-btn');
+            const original = btn.innerHTML;
+            btn.disabled = true; btn.textContent = 'Checking photo…';
+            const fd = new FormData();
+            fd.append('name', $('reg-name').value.trim());
+            fd.append('aadhaar', $('reg-aadhaar').value.trim());
+            fd.append('phone', $('reg-phone').value.trim());
+            fd.append('constituency', $('reg-constituency').value);
+            fd.append('photo', selectedFile);
+            try {
+                const res = await fetch('/register/start', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.success) { if (data.mode === 'firebase') { await startFirebaseOtp(data); } else { showOtpStep(data); } }
+                else { showError(data.message || 'Registration failed.'); }
+            } catch (e) { showError('Connection error. Please try again.'); }
+            btn.disabled = false; btn.innerHTML = original;
+        });
+
+        // ---------- Step 3: confirm OTP ----------
+        $('verify-otp-btn').addEventListener('click', async () => {
+            clearError();
+            const otp = $('reg-otp').value.trim();
+            if (!/^[0-9]{6}$/.test(otp)) { return showError('Please enter the 6-digit OTP.'); }
+            const btn = $('verify-otp-btn'); btn.disabled = true;
+            let payload;
+            try {
+                payload = firebaseMode ? { id_token: await window.FirebaseOtp.confirmCode(otp) } : { otp };
+            } catch (err) { btn.disabled = false; return showError(window.FirebaseOtp.describeError(err)); }
+            try {
+                const data = await postJSON('/register/verify', payload);
+                if (data.success) {
+                    $('success-detail').textContent = 'You are now registered to vote in the ' + data.voter.constituency + ' constituency.';
+                    $('receipt-name').textContent = data.voter.name;
+                    $('receipt-aadhaar').textContent = data.voter.aadhaar;
+                    $('receipt-phone').textContent = data.voter.phone;
+                    $('receipt-const').textContent = data.voter.constituency;
+                    clearInterval(resendTimer);
+                    goStep(4);
+                } else { showError(data.message || 'Verification failed.'); }
+            } catch (e) { showError('Connection error. Please try again.'); }
+            btn.disabled = false;
+        });
+
+        $('resend-btn').addEventListener('click', async () => {
+            clearError();
+            if (firebaseMode) {
+                try {
+                    await window.FirebaseOtp.sendCode(regPhone, 'recaptcha-container');
+                    $('otp-sent-msg').textContent = 'A new verification code has been sent.';
+                    startResendCooldown(30);
+                } catch (err) { showError(window.FirebaseOtp.describeError(err)); }
+                return;
+            }
+            try {
+                const data = await postJSON('/register/resend');
+                if (data.success) {
+                    if (data.otp) { $('demo-otp-code').textContent = data.otp; $('demo-otp').classList.add('visible'); }
+                    $('otp-sent-msg').textContent = data.message;
+                    startResendCooldown(30);
+                } else { showError(data.message || 'Could not resend the OTP.'); }
+            } catch (e) { showError('Connection error. Please try again.'); }
+        });
+        window.addEventListener('beforeunload', stopCamera);
+    </script>
+</body>
+</html>

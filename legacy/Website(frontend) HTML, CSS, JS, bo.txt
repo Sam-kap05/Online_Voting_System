@@ -1,0 +1,8 @@
+Website(frontend): HTML, CSS, JS, bootstrap, react.js, Website(backend): express.js(node.js)
+Database: MYSQL/postGRE
+OTP:Twilio
+facial recog: OpenCV, google vision API, FaceNet/Deepface
+cybersec: HTTPS using SSL/TLS (eg. lets encrypt)
+vote casting: Record the vote using secure API calls. Use ELK Stack (Elasticsearch, Logstash, and Kibana) or a simple logging library like Winston (Node.js) to log voting actions and errors.
+hosting: GitHub
+

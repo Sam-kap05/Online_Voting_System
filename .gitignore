@@ -1,0 +1,19 @@
+# Runtime data - contains personal data (faces, phone numbers) and secrets. NEVER commit.
+instance/
+*.db
+*.db-wal
+*.db-shm
+static/uploads/
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Editor / OS junk
+tempCodeRunnerFile.py
+*.stackdump
+.DS_Store
