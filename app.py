@@ -26,7 +26,7 @@ import time
 import unicodedata
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from functools import wraps
 
 import click
@@ -35,11 +35,13 @@ import numpy as np
 from flask import (Blueprint, Flask, current_app, g, jsonify, redirect,
                    render_template, request, session)
 from PIL import Image
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import firebase_auth
 import liveness
 import sms_gateway
+import uidai_kyc
 from face_service import DeepFaceService
 
 if not os.environ.get("DESHGARV_NO_DOTENV"):       # optional: read settings from a .env file
@@ -52,6 +54,27 @@ if not os.environ.get("DESHGARV_NO_DOTENV"):       # optional: read settings fro
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
 GENESIS_HASH = "0" * 64
+# Example values that have appeared in templates/docs: publicly known, so never acceptable as real secrets.
+KNOWN_PLACEHOLDERS = {"long-random-string", "another-long-random-string", "changeme", "change-me", "secret",
+                      "password", "your-secret-key", "your_secret_key"}
+
+
+def production_secret_problems(cfg):
+    """Why the secrets are unsafe for real voters ([] = fine). Used at startup in production mode."""
+    problems = []
+    for key, label in (("SECRET_KEY", "SECRET_KEY"), ("PEPPER", "DESHGARV_PEPPER")):
+        value = cfg.get(key) or ""
+        if value.lower() in KNOWN_PLACEHOLDERS:
+            problems.append(f"{label} is the placeholder text from the example file (publicly known)")
+        elif len(value) < 32:
+            problems.append(f"{label} is too short ({len(value)} characters; needs 32+ random ones)")
+    h = cfg.get("ADMIN_PASSWORD_HASH") or ""
+    if not re.match(r"^(scrypt|pbkdf2):", h):
+        problems.append("ADMIN_PASSWORD_HASH is not a password hash (it must start with 'scrypt:' or 'pbkdf2:'; "
+                        "it looks like placeholder text)")
+    elif check_password_hash(h, "admin123"):
+        problems.append("ADMIN_PASSWORD_HASH is the hash of the demo password 'admin123'")
+    return problems
 
 bp = Blueprint("main", __name__)
 
@@ -71,7 +94,10 @@ CREATE TABLE IF NOT EXISTS voters (
     face_embedding TEXT,                   -- JSON list, cached face template
     has_voted      INTEGER NOT NULL DEFAULT 0,
     voted_at       TEXT,
-    registered_at  TEXT NOT NULL
+    registered_at  TEXT NOT NULL,
+    identity_key   TEXT,                   -- HMAC(name|dob|gender|last4) from the UIDAI-signed file: one real person
+    kyc_verified   INTEGER NOT NULL DEFAULT 0,
+    face_gallery   TEXT                    -- JSON list of extra face templates (UIDAI photo, successful live logins)
 );
 CREATE TABLE IF NOT EXISTS candidates (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,6 +136,9 @@ CREATE TABLE IF NOT EXISTS pending_registrations (
     constituency   TEXT NOT NULL,
     photo_file     TEXT NOT NULL,
     face_embedding TEXT NOT NULL,
+    identity_key   TEXT,
+    kyc_verified   INTEGER NOT NULL DEFAULT 0,
+    gallery        TEXT,
     expires_at     REAL NOT NULL
 );
 -- Firebase ID tokens already redeemed: each phone verification can be used exactly once.
@@ -313,10 +342,18 @@ def init_db(app):
     os.makedirs(app.config["PHOTO_DIR"], exist_ok=True)
     conn = sqlite3.connect(app.config["DATABASE"])
     conn.execute("PRAGMA journal_mode = WAL")
+    pcols = {r[1] for r in conn.execute("PRAGMA table_info(pending_registrations)")}
+    if pcols and "identity_key" not in pcols:     # pending registrations are short-lived: rebuild
+        conn.execute("DROP TABLE pending_registrations")
     cols = {r[1] for r in conn.execute("PRAGMA table_info(auth_sessions)")}
     if cols and not {"live_verified", "live_anchor"} <= cols:      # older database: sessions are short-lived, rebuild
         conn.execute("DROP TABLE auth_sessions")
     conn.executescript(SCHEMA)
+    vcols = {r[1] for r in conn.execute("PRAGMA table_info(voters)")}
+    for col, ddl in (("identity_key", "TEXT"), ("kyc_verified", "INTEGER NOT NULL DEFAULT 0"), ("face_gallery", "TEXT")):
+        if col not in vcols:                      # database created by an older version
+            conn.execute(f"ALTER TABLE voters ADD COLUMN {col} {ddl}")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_voters_identity ON voters(identity_key) WHERE identity_key IS NOT NULL")
     conn.commit()
     conn.close()
 
@@ -444,8 +481,8 @@ def check_otp(db, purpose, subject, code):
     return True, ""
 
 
-def otp_response(code, message):
-    body = {"success": True, "message": message}
+def otp_response(code, message, **extra):
+    body = {"success": True, "message": message, **extra}
     if current_app.config["DEMO_MODE"] and sms_gateway.provider_name() == "console":
         body["otp"] = code  # local demo only; never when a real SMS provider is configured
     return jsonify(body)
@@ -527,6 +564,83 @@ def reference_embedding(db, auth):
 
 
 # =============================================================================
+# Face templates (one person can be recognised from several stored faces)
+# =============================================================================
+MAX_GALLERY = 5
+
+
+def voter_templates(row):
+    """Every stored face template of a voter: the registration photo + UIDAI photo + past successful live logins."""
+    out = []
+    if row["face_embedding"]:
+        out.append(json.loads(row["face_embedding"]))
+    if row["face_gallery"]:
+        out += json.loads(row["face_gallery"])
+    return out
+
+
+def find_duplicate_face(db, svc, embedding):
+    """Is this face already enrolled? Compare against ALL templates of ALL voters.
+
+    The old single-photo / 0.35 check only caught the *same photo*; a new photo or a webcam capture of the same
+    person sits at 0.4-0.6 (measured: same person across different photos median 0.42, max 0.62; different people
+    never closer than 0.69), so the limit is 0.60 and live-login faces are kept as extra templates."""
+    limit = getattr(svc, "duplicate_threshold", 0)
+    if limit <= 0:
+        return None
+    for row in db.execute("SELECT id, face_embedding, face_gallery FROM voters WHERE face_embedding IS NOT NULL"):
+        for template in voter_templates(row):
+            if svc.distance(embedding, template) <= limit:
+                return row["id"]
+    return None
+
+
+def add_to_gallery(db, svc, voter_id, embedding):
+    row = db.execute("SELECT face_gallery FROM voters WHERE id=?", (voter_id,)).fetchone()
+    gallery = json.loads(row["face_gallery"]) if row and row["face_gallery"] else []
+    new = [float(x) for x in embedding]
+    if all(svc.distance(new, g) > 0.05 for g in gallery):          # skip near-identical templates
+        gallery = (gallery + [new])[-MAX_GALLERY:]
+        db.execute("UPDATE voters SET face_gallery=? WHERE id=?", (json.dumps(gallery), voter_id))
+
+
+def verify_kyc(svc, selfie_face, aadhaar, phone):
+    """Check the uploaded UIDAI offline e-KYC file against everything the voter typed. -> (info | None, error response | None)"""
+    cfg, db = current_app.config, get_db()
+    upload = request.files.get("kyc_zip")
+    share = (request.form.get("share_code") or "").strip()
+    if upload is None or not upload.filename:
+        return None, jerr("Please upload your Aadhaar offline e-KYC ZIP file (instructions are on this page).")
+    try:
+        record = uidai_kyc.verify_offline_kyc(upload.read(), share, current_app.extensions["uidai_certs"],
+                                              max_age_days=cfg["AADHAAR_XML_MAX_AGE_DAYS"])
+        if not uidai_kyc.is_old_enough(record.dob, date.today(), cfg["MIN_VOTING_AGE"]):
+            return None, jerr(f"You must be at least {cfg['MIN_VOTING_AGE']} years old to register.")
+        xml_img = uidai_kyc.decode_photo(record.photo)
+    except uidai_kyc.KycError as exc:
+        return None, jerr(str(exc))
+    if record.last4 != aadhaar[-4:]:
+        return None, jerr(f"This file belongs to an Aadhaar number ending in {record.last4}, but the number you typed "
+                          f"ends in {aadhaar[-4:]}.")
+    if cfg["AADHAAR_CHECK_MOBILE"] and not uidai_kyc.check_mobile(record, phone, share, aadhaar):
+        return None, jerr("This mobile number is not the one linked to your Aadhaar (or the share code is not the one you "
+                          "chose when downloading). Use your Aadhaar-linked mobile number.")
+    xml_faces = svc.detect(xml_img)
+    if not xml_faces:
+        return None, jerr("We could not find a clear face in the photo inside your Aadhaar file.")
+    xml_face = max(xml_faces, key=lambda f: f.w * f.h)
+    dist = svc.distance(selfie_face.embedding, xml_face.embedding)
+    print(f"[KYC] selfie vs Aadhaar photo distance {dist:.3f} (limit {cfg['AADHAAR_PHOTO_MATCH_THRESHOLD']})")
+    if dist > cfg["AADHAAR_PHOTO_MATCH_THRESHOLD"]:
+        return None, jerr("Your photo does not match the photo in your Aadhaar file. Please take a clear, front-facing "
+                          "photo of yourself.")
+    key = uidai_kyc.identity_key(record, cfg["PEPPER"])
+    if db.execute("SELECT 1 FROM voters WHERE identity_key=?", (key,)).fetchone():
+        return None, jerr("This person is already registered. Each person may register only once.", 409)
+    return {"record": record, "identity_key": key, "xml_embedding": xml_face.embedding}, None
+
+
+# =============================================================================
 # Pages
 # =============================================================================
 @bp.route("/")
@@ -541,7 +655,9 @@ def verify():
 
 @bp.route("/register", methods=["GET"])
 def register_page():
-    return render_template("register.html", constituencies=current_app.config["CONSTITUENCIES"])
+    cfg = current_app.config
+    return render_template("register.html", constituencies=cfg["CONSTITUENCIES"],
+                           kyc_required=cfg["AADHAAR_KYC"] == "offline_xml", min_age=cfg["MIN_VOTING_AGE"])
 
 
 @bp.route("/voting-page")
@@ -577,13 +693,14 @@ def drop_pending(db, token):
 @rate_limited("register_start", 6)
 def register_start():
     cfg, db = current_app.config, get_db()
-    name = clean_name(request.form.get("name"))
+    kyc_on = cfg["AADHAAR_KYC"] == "offline_xml"
+    name = None if kyc_on else clean_name(request.form.get("name"))     # with KYC the name comes from UIDAI's file
     aadhaar = (request.form.get("aadhaar") or "").strip()
     phone = (request.form.get("phone") or "").strip()
     constituency = (request.form.get("constituency") or "").strip()
     upload = request.files.get("photo")
 
-    if not name:
+    if not kyc_on and not name:
         return jerr("Please enter your full name (letters only, 2-80 characters).")
     if not valid_aadhaar(aadhaar):
         return jerr("Invalid Aadhaar number. It must be exactly 12 digits.")
@@ -615,13 +732,16 @@ def register_start():
     if db.execute("SELECT 1 FROM voters WHERE aadhaar_hash=?", (a_hash,)).fetchone():
         return jerr("This Aadhaar number is already registered.", 409)
 
-    # One person, one identity: reject a face that is already enrolled.
-    dup_thr = getattr(svc, "duplicate_threshold", 0)
-    if dup_thr > 0:
-        for row in db.execute("SELECT face_embedding FROM voters WHERE face_embedding IS NOT NULL"):
-            if svc.distance(faces[0].embedding, json.loads(row["face_embedding"])) <= dup_thr:
-                return jerr("A voter with a matching face is already registered. "
-                            "Each person may register only once.", 409)
+    kyc = None
+    if kyc_on:                              # proves the person really holds this Aadhaar (UIDAI-signed file)
+        kyc, error = verify_kyc(svc, faces[0], aadhaar, phone)
+        if error:
+            return error
+        name = kyc["record"].name
+
+    # One person, one identity: reject a face that is already enrolled (any stored template of any voter).
+    if find_duplicate_face(db, svc, faces[0].embedding) is not None:
+        return jerr("A voter with a matching face is already registered. Each person may register only once.", 409)
 
     old = session.pop("reg_token", None)   # replace an earlier pending attempt
     if old:
@@ -631,13 +751,16 @@ def register_start():
     photo_file = save_photo(img)
     db.execute(
         "INSERT INTO pending_registrations (token, name, aadhaar_hash, aadhaar_last4, phone,"
-        " constituency, photo_file, face_embedding, expires_at) VALUES (?,?,?,?,?,?,?,?,?)",
-        (token, name, a_hash, aadhaar[-4:], phone, constituency, photo_file,
-         json.dumps(faces[0].embedding), time.time() + 30 * 60),
+        " constituency, photo_file, face_embedding, identity_key, kyc_verified, gallery, expires_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (token, name, a_hash, aadhaar[-4:], phone, constituency, photo_file, json.dumps(faces[0].embedding),
+         kyc["identity_key"] if kyc else None, 1 if kyc else 0,
+         json.dumps([kyc["xml_embedding"]]) if kyc else None, time.time() + 30 * 60),
     )
+    extra = {"verified_name": name} if kyc else {}
     if otp_mode() == "firebase":      # the browser will ask Firebase to text the code
         session["reg_token"] = token
-        return jsonify(success=True, mode="firebase", phone=phone,
+        return jsonify(success=True, mode="firebase", phone=phone, **extra,
                        message=f"We will send a verification code to {mask_phone(phone)}.")
     try:
         code = issue_otp(db, "register", token, phone)
@@ -648,7 +771,7 @@ def register_start():
         drop_pending(db, token)
         return jerr("Could not send the OTP right now. Please try again later.", 503)
     session["reg_token"] = token
-    return otp_response(code, f"A 6-digit OTP has been sent to {mask_phone(phone)}.")
+    return otp_response(code, f"A 6-digit OTP has been sent to {mask_phone(phone)}.", **extra)
 
 
 def _pending():
@@ -694,15 +817,17 @@ def register_verify():
         with transaction(db):
             db.execute(
                 "INSERT INTO voters (aadhaar_hash, aadhaar_last4, name, phone, constituency,"
-                " photo_file, face_embedding, registered_at) VALUES (?,?,?,?,?,?,?,?)",
+                " photo_file, face_embedding, registered_at, identity_key, kyc_verified, face_gallery)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (pend["aadhaar_hash"], pend["aadhaar_last4"], pend["name"], pend["phone"],
-                 pend["constituency"], pend["photo_file"], pend["face_embedding"], now_iso()),
+                 pend["constituency"], pend["photo_file"], pend["face_embedding"], now_iso(),
+                 pend["identity_key"], pend["kyc_verified"], pend["gallery"]),
             )
             db.execute("DELETE FROM pending_registrations WHERE token=?", (pend["token"],))
     except sqlite3.IntegrityError:  # someone else completed this Aadhaar first
         drop_pending(db, pend["token"])
         session.pop("reg_token", None)
-        return jerr("This Aadhaar number is already registered.", 409)
+        return jerr("This Aadhaar number or person is already registered.", 409)
     session.pop("reg_token", None)
     return jsonify(success=True, message=f"Voter {pend['name']} registered successfully.",
                    voter={"name": pend["name"], "aadhaar": mask_aadhaar(pend["aadhaar_last4"]),
@@ -824,6 +949,8 @@ def verify_face():
                " frames_checked=frames_checked+1 WHERE token=?",
                (streak, 1 if verified else 0, json.dumps(anchor.tolist()) if anchor is not None else None,
                 auth["token"]))
+    if verified and anchor is not None:      # this live face matched: keep it, so webcam look-alikes are caught later
+        add_to_gallery(db, svc, auth["voter_id"], anchor)
     return jsonify(success=True, verified=verified, status=status, streak=streak, required=need,
                    liveness_required=cfg["LIVENESS_ENABLED"])
 
@@ -933,7 +1060,10 @@ def liveness_frame():
             return reply("busy")
         return reply(status)
 
-    state, status = liveness.step(state, pose.yaw, now, lcfg)
+    # Some cameras / drivers deliver a mirrored picture. LIVENESS_FLIP_DIRECTIONS fixes that for the whole site and the
+    # voter's own "swap" switch (a form field) fixes it per device; the two combine (XOR).
+    flip = lcfg.flip_directions != (request.form.get("swap") == "1")
+    state, status = liveness.step(state, pose.yaw, now, lcfg, flip=flip)
     if status == "timeout":
         persist(None)
         return reply("challenge_failed", can_retry=auth["live_challenges"] < lcfg.max_challenges)
@@ -1120,6 +1250,13 @@ def create_app(test_config=None):
         AUTH_TTL=15 * 60, FACE_STREAK_REQUIRED=3, FACE_MAX_FRAMES=150,
         RATELIMIT_ENABLED=True,
         FIREBASE_TOKEN_MAX_AGE=300,
+        TRUST_PROXY_HOPS=int(os.environ.get("TRUST_PROXY_HOPS", "0")),
+        AADHAAR_KYC=os.environ.get("AADHAAR_KYC", "off" if demo else "offline_xml").strip().lower(),
+        UIDAI_CERT_DIR=os.environ.get("UIDAI_CERT_DIR", os.path.join(BASE_DIR, "uidai_certs")),
+        AADHAAR_XML_MAX_AGE_DAYS=float(os.environ.get("AADHAAR_XML_MAX_AGE_DAYS", "3")),
+        AADHAAR_PHOTO_MATCH_THRESHOLD=float(os.environ.get("AADHAAR_PHOTO_MATCH_THRESHOLD", "0.68")),
+        AADHAAR_CHECK_MOBILE=os.environ.get("AADHAAR_CHECK_MOBILE", "1") != "0",
+        MIN_VOTING_AGE=int(os.environ.get("MIN_VOTING_AGE", "18")),
         LIVENESS_ENABLED=os.environ.get("LIVENESS", "1") != "0",
         MAX_CONTENT_LENGTH=8 * 1024 * 1024,
         SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
@@ -1139,29 +1276,60 @@ def create_app(test_config=None):
         if not cfg["ADMIN_PASSWORD_HASH"]:
             if not cfg["DEMO_MODE"]:
                 raise RuntimeError("ADMIN_PASSWORD_HASH must be set when DESHGARV_DEMO=0 "
-                                   "(generate one with: flask --app app hash-password)")
+                                   "(generate it with: python make_secrets.py)")
             cfg["ADMIN_PASSWORD_HASH"] = generate_password_hash("admin123")
+
+    if cfg["AADHAAR_KYC"] not in ("off", "offline_xml"):
+        raise RuntimeError("AADHAAR_KYC must be 'offline_xml' or 'off'")
+    certs = cfg.get("UIDAI_CERTS")
+    if certs is None:
+        certs = []
+        if cfg["AADHAAR_KYC"] == "offline_xml":
+            try:
+                certs = uidai_kyc.load_certs(cfg["UIDAI_CERT_DIR"])
+            except ValueError as exc:
+                raise RuntimeError(f"UIDAI certificate problem: {exc}")
+    if cfg["AADHAAR_KYC"] == "offline_xml" and not certs and not cfg.get("TESTING"):
+        raise RuntimeError(
+            "Aadhaar verification (AADHAAR_KYC=offline_xml) needs UIDAI's public certificate. Download it from "
+            "https://uidai.gov.in/en/aadhaar-paperless-offline-e-kyc (\"Get Certificate\") and save the .cer file in the "
+            f"folder '{cfg['UIDAI_CERT_DIR']}'. To run without Aadhaar verification set AADHAAR_KYC=off (anyone who knows an "
+            "Aadhaar number can then register as that person).")
+    app.extensions["uidai_certs"] = certs
+
+    if not cfg["DEMO_MODE"] and not cfg.get("TESTING"):
+        unsafe = production_secret_problems(cfg)
+        if unsafe:
+            raise RuntimeError("Unsafe secrets for production: " + "; ".join(unsafe) +
+                               ". Generate real ones with:  python make_secrets.py")
 
     if not cfg.get("SKIP_SMS_CHECK"):             # fail fast instead of at the first voter
         problems = sms_gateway.config_problems()
         if sms_gateway.provider_name() == "console" and not cfg["DEMO_MODE"]:
-            problems.append("DESHGARV_DEMO=0 needs SMS_PROVIDER=twilio or msg91")
+            problems.append("DESHGARV_DEMO=0 needs SMS_PROVIDER=firebase, twilio or msg91")
         if problems:
             raise RuntimeError("SMS configuration error: " + "; ".join(problems))
 
+    if cfg["TRUST_PROXY_HOPS"] > 0:
+        # Behind nginx/Caddy/a cloud load balancer every request would otherwise look like it comes from the
+        # proxy's IP, so the per-IP rate limits would throttle ALL voters together. Only trust as many
+        # forwarded hops as you really have: more would let clients spoof their IP and dodge the limits.
+        n = cfg["TRUST_PROXY_HOPS"]
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=n, x_proto=n, x_host=n)
     app.extensions["firebase_certs"] = cfg.get("FIREBASE_CERTS") or firebase_auth.CertCache()
 
     @app.context_processor
     def inject_otp_mode():                        # used by verify.html / register.html
         firebase = otp_mode() == "firebase"
-        return {"otp_mode": otp_mode(), "firebase_config": sms_gateway.firebase_client_config() if firebase else None}
+        return {"otp_mode": otp_mode(), "firebase_config": sms_gateway.firebase_client_config() if firebase else None,
+                "liveness_flip": bool(app.extensions["liveness_cfg"].flip_directions)}
 
     app.extensions["limiter"] = RateLimiter()
     app.extensions["face_service"] = cfg.get("FACE_SERVICE") or DeepFaceService(
         model_name=os.environ.get("FACE_MODEL", "VGG-Face"),
         detector_backend=os.environ.get("FACE_DETECTOR", "opencv"),
         match_threshold=float(os.environ.get("FACE_MATCH_THRESHOLD", "0.55")),
-        duplicate_threshold=float(os.environ.get("FACE_DUPLICATE_THRESHOLD", "0.35")),
+        duplicate_threshold=float(os.environ.get("FACE_DUPLICATE_THRESHOLD", "0.60")),
     )
 
     app.extensions["liveness_cfg"] = cfg.get("LIVENESS_CFG") or liveness.LivenessConfig.from_env()
@@ -1186,6 +1354,8 @@ def create_app(test_config=None):
         resp.headers.setdefault("X-Frame-Options", "DENY")
         resp.headers.setdefault("Referrer-Policy", "same-origin")
         resp.headers.setdefault("Permissions-Policy", "camera=(self), microphone=(), geolocation=()")
+        if not cfg["DEMO_MODE"] and request.is_secure:
+            resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")  # browsers: HTTPS only
         if request.endpoint != "static":
             resp.headers["Cache-Control"] = "no-store"  # never cache ballots / voter data
         return resp
@@ -1231,11 +1401,35 @@ def create_app(test_config=None):
     return app
 
 
+def describe_runtime(app):
+    """Plain-English summary of what is ACTUALLY active (so a wrong/missing .env can't hide)."""
+    cfg, provider = app.config, sms_gateway.provider_name()
+    env_file = os.path.exists(os.path.join(BASE_DIR, ".env"))
+    if cfg["DEMO_MODE"]:
+        mode = "DEMO  (fake data seeded, admin is admin/admin123, NOT for real voters)"
+    else:
+        mode = "PRODUCTION"
+    otp = {"firebase": "Firebase (Firebase sends and checks the SMS code)",
+           "twilio": "Twilio SMS", "msg91": "MSG91 SMS",
+           "console": "console  <-- DEMO: the OTP is shown on screen and no SMS is sent"}[provider]
+    lines = ["", "=" * 74, f" DeshGarv  |  mode: {mode}",
+             f"   OTP delivery   : {otp}",
+             f"   Liveness check : {'ON' if cfg['LIVENESS_ENABLED'] else 'OFF  <-- a held-up photo may pass'}",
+             f"   Settings file  : {'.env loaded' if env_file else '.env NOT FOUND  <-- the app reads .env, NOT .env.example (copy it to .env)'}",
+             f"   Secure cookies : {'yes (needs HTTPS)' if cfg['SESSION_COOKIE_SECURE'] else 'no (demo)'}",
+             f"   Behind a proxy : {cfg['TRUST_PROXY_HOPS']} trusted hop(s)",
+             "   Aadhaar check  : " + (f"UIDAI offline e-KYC ({len(app.extensions['uidai_certs'])} certificate(s))"
+                                       if cfg["AADHAAR_KYC"] == "offline_xml" else
+                                       "OFF  <-- anyone who knows an Aadhaar number can register as that person")]
+    if provider == "firebase" and sms_gateway.firebase_client_config().get("testMode"):
+        lines.append("   Firebase TEST MODE: ON  <-- DEV ONLY: reCAPTCHA is skipped, only Firebase test numbers work")
+    lines += ["=" * 74, ""]
+    return lines
+
+
 if __name__ == "__main__":
     application = create_app()
-    if application.config["DEMO_MODE"]:
-        print("\n*** DEMO MODE: OTPs are shown on screen and admin login is admin / admin123. ***\n"
-              "*** Set DESHGARV_DEMO=0 (and the variables in the README) for real use.       ***\n")
+    print("\n".join(describe_runtime(application)))
     # Warm the model in the background so the first voter doesn't wait ~10s.
     threading.Thread(target=application.extensions["face_service"].warmup, daemon=True).start()
     if application.config["LIVENESS_ENABLED"]:

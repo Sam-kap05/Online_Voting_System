@@ -399,3 +399,11 @@ class TestPagesAndConfig:
 def sms_cfg(env):
     import sms_gateway
     return sms_gateway.firebase_client_config(env)
+
+
+class TestDeliveryHelp:
+    def test_both_pages_tell_voters_what_to_do_when_the_code_does_not_arrive(self, ctx):
+        for path in ("/register", "/verify"):
+            html = ctx.app.test_client().get(path).get_data(as_text=True)
+            assert "Didn't receive the code?" in html and "Wait up to 2 minutes" in html and "blocked / spam" in html
+            assert "requested at" in html                       # timestamp to correlate with Firebase's records

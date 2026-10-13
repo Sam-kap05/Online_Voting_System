@@ -208,6 +208,7 @@
         .face-status.warn { background: rgba(230,126,0,.92); }
         .face-progress { max-width: 480px; height: 8px; margin: 10px auto 0; background: #ddd; border-radius: 4px; overflow: hidden; }
         #face-progress-bar { height: 100%; width: 0; background: #4caf50; transition: width .3s; }
+        .camera-box.no-mirror video { transform: none; }
         .face-hint { font-size: .85em; color: #666; text-align: center; margin-top: 8px; }
     </style>
 </head>
@@ -310,6 +311,16 @@
                     <input type="text" id="otp-input" class="form-input" placeholder="Enter 6-digit OTP" maxlength="6">
                 </div>
                 <button id="verifyOtpBtn" class="button" style="display: none;">Verify OTP</button>
+                <details class="otp-help" style="margin-top: 14px; font-size: 0.92em; color: #444;">
+                    <summary style="cursor: pointer; font-weight: bold;">Didn't receive the code?</summary>
+                    <ul style="margin: 8px 0 0 18px; line-height: 1.55;">
+                        <li>Wait up to 2 minutes - text messages can be delayed.</li>
+                        <li>Check that the number shown above is yours. If it is wrong, reload this page and start again.</li>
+                        <li>Look in your blocked / spam messages, and switch off any "filter unknown senders" or Do-Not-Disturb setting for a moment.</li>
+                        <li>Press <b>Resend</b> only after the timer ends - pressing it repeatedly makes delivery worse.</li>
+                    </ul>
+                </details>
+
             </div>
 
             <!-- Facial Verification Section -->
@@ -322,6 +333,7 @@
                 </div>
                 <div class="face-progress"><div id="face-progress-bar"></div></div>
                 <p class="face-hint" id="face-debug" style="display: none; font-family: monospace; color: #888;"></p>
+                <p class="face-hint"><a href="#" id="swap-lr" style="color: #222674; font-weight: bold;">Left and right feel swapped? Tap here to swap them.</a></p>
                 <p class="face-hint" id="face-hint">Hold still until the bar is full. Good lighting helps.</p>
                 <canvas id="capture-canvas" style="display: none;"></canvas>
                 <button id="proceed-btn" class="button" disabled>Proceed to Vote</button>
@@ -388,7 +400,8 @@
             }
         }
 
-        const FIREBASE_CONFIG = {{ firebase_config|tojson }};   // public web config, or null when not using Firebase
+        const FIREBASE_CONFIG = {{ firebase_config|tojson }};
+        const LIVENESS_FLIP = {{ liveness_flip|tojson }};   // site-wide: the camera delivers a mirrored picture   // public web config, or null when not using Firebase
 
         document.addEventListener('DOMContentLoaded', function () {
             const $ = (id) => document.getElementById(id);
@@ -453,7 +466,7 @@
                 try {
                     if (!firebaseReady) { await window.FirebaseOtp.init(FIREBASE_CONFIG); firebaseReady = true; }
                     await window.FirebaseOtp.sendCode(phone, 'recaptcha-container');
-                    successDiv.textContent = 'Verification code sent to +91 ' + phone.slice(0, 2) + 'XXXXXX' + phone.slice(-2) + '.';
+                    successDiv.textContent = 'Verification code sent to +91 ' + phone.slice(0, 2) + 'XXXXXX' + phone.slice(-2) + ' (requested at ' + new Date().toLocaleTimeString() + ').';
                     successDiv.classList.add('visible');
                     otpInput.style.display = 'block';
                     $('verifyOtpBtn').style.display = 'block';
@@ -596,6 +609,7 @@
                     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
                     const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.85));
                     const fd = new FormData(); fd.append('frame', blob, 'frame.jpg');
+                    if (mode === 'liveness') { fd.append('swap', userSwap ? '1' : '0'); }
                     const res = await fetch(mode === 'face' ? '/verify_face' : '/liveness/frame', { method: 'POST', body: fd });
                     const data = await res.json();
 
@@ -622,6 +636,21 @@
                     setStatus('Connection problem - retrying…', 'warn');
                 } finally { inFlight = false; }
             }
+
+            // ---- left/right swap: some cameras deliver a MIRRORED picture. Remembered per device.
+            let userSwap = false;
+            try { userSwap = window.localStorage.getItem('deshgarv_swap_lr') === '1'; } catch (e) { /* storage blocked */ }
+            const camBox = document.querySelector('.camera-box');
+            // keep the preview behaving like a mirror whichever way the camera delivers its picture
+            const applyMirror = () => camBox.classList.toggle('no-mirror', LIVENESS_FLIP !== userSwap);
+            applyMirror();
+            $('swap-lr').addEventListener('click', (ev) => {
+                ev.preventDefault();
+                userSwap = !userSwap;
+                try { window.localStorage.setItem('deshgarv_swap_lr', userSwap ? '1' : '0'); } catch (e) { /* ignore */ }
+                applyMirror(); lastSpoken = '';
+                setStatus(userSwap ? 'Left and right swapped. Try turning again.' : 'Back to the normal setting. Try turning again.', 'warn');
+            });
 
             proceedBtn.addEventListener('click', () => { window.location.href = '/voting-page'; });
             window.addEventListener('beforeunload', stopCamera);

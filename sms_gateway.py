@@ -46,6 +46,22 @@ def provider_name(env=None):
     return (env.get("SMS_PROVIDER") or "console").strip().lower()
 
 
+def _firebase_value_problems(env):
+    """Catch the copy/paste mistakes that otherwise surface later as a confusing 'security check failed'."""
+    problems = []
+    for key in ("FIREBASE_API_KEY", "FIREBASE_PROJECT_ID", "FIREBASE_AUTH_DOMAIN", "FIREBASE_APP_ID"):
+        value = (env.get(key) or "").strip()
+        if value and not re.fullmatch(r"[A-Za-z0-9_.:\-]+", value):
+            problems.append(f"{key} contains characters that do not belong in it (quotes, spaces or an inline "
+                            f"'# comment'?) - put the bare value on the line, nothing else")
+    domain = (env.get("FIREBASE_AUTH_DOMAIN") or "").strip().lower()
+    if domain.endswith((".firebasestorage.app", ".appspot.com")):
+        problems.append(f"FIREBASE_AUTH_DOMAIN is '{domain}', which is your Cloud Storage bucket, not your auth domain. "
+                        f"Use '{firebase_project_id(env)}.firebaseapp.com' (copy 'authDomain' - not 'storageBucket' - "
+                        f"from the Firebase config) or leave the line out")
+    return problems
+
+
 def config_problems(env=None):
     """Human-readable list of what's wrong with the SMS configuration ([] = fine)."""
     env = os.environ if env is None else env
@@ -53,6 +69,8 @@ def config_problems(env=None):
     if name not in PROVIDERS:
         return [f"SMS_PROVIDER must be one of {', '.join(PROVIDERS)} (got '{name}')"]
     problems = [f"{k} is not set" for k in _REQUIRED[name] if not env.get(k)]
+    if name == "firebase":
+        problems += _firebase_value_problems(env)
     if name == "twilio" and not (env.get("TWILIO_FROM_NUMBER") or env.get("TWILIO_MESSAGING_SERVICE_SID")):
         problems.append("set TWILIO_FROM_NUMBER or TWILIO_MESSAGING_SERVICE_SID")
     return problems
@@ -72,6 +90,8 @@ def firebase_client_config(env=None):
            "authDomain": (env.get("FIREBASE_AUTH_DOMAIN") or f"{project}.firebaseapp.com").strip()}
     if env.get("FIREBASE_APP_ID"):
         cfg["appId"] = env["FIREBASE_APP_ID"].strip()
+    if (env.get("FIREBASE_TEST_MODE") or "").strip() == "1":
+        cfg["testMode"] = True          # DEV ONLY: skip reCAPTCHA for Firebase's fictional test numbers
     return cfg
 
 

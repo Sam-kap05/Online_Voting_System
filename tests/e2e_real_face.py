@@ -102,12 +102,20 @@ check("vote accepted", c.post("/cast_vote", json={"candidate_id": cand}).status_
 
 print("\n2) Self-registration with a real photo")
 cr = app.test_client()
+# The two demo photos look like the same person (distance ~0.43). Since the duplicate check now catches a DIFFERENT photo
+# of an already-enrolled person (limit 0.60), registering photo B while Samarth (photo A) is enrolled must be refused.
 r = cr.post("/register/start", data={"name": "Priya Nair", "aadhaar": "234567890123", "phone": "9812345678",
                                       "constituency": "New Delhi", "photo": (io.BytesIO(jpg_bytes(B, 1000)), "p.jpg")},
             content_type="multipart/form-data")
-check("valid photo accepted, OTP sent", r.status_code == 200, r.get_json().get("message", ""))
+check("a DIFFERENT photo of an already-enrolled person is refused", r.status_code == 409 and "matching face" in r.get_json()["message"], r.get_json().get("message", "")[:60])
+svc.duplicate_threshold = 0.0            # the rest of the flow needs a registration to succeed: switch the face rule off for it
+r = cr.post("/register/start", data={"name": "Priya Nair", "aadhaar": "234567890123", "phone": "9812345678",
+                                      "constituency": "New Delhi", "photo": (io.BytesIO(jpg_bytes(B, 1000)), "p.jpg")},
+            content_type="multipart/form-data")
+check("valid photo accepted, OTP sent (face rule off)", r.status_code == 200, r.get_json().get("message", ""))
 check("registration completes with correct OTP",
-      cr.post("/register/verify", json={"otp": otp()}).status_code == 200)
+      cr.post("/register/verify", json={"otp": re.match(r"(\d{6})", sent[-1]).group(1)}).status_code == 200)
+svc.duplicate_threshold = 0.60
 
 r = app.test_client().post("/register/start", data={
     "name": "Impostor", "aadhaar": "345678901234", "phone": "9811111111", "constituency": "New Delhi",

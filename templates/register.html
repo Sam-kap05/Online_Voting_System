@@ -362,10 +362,12 @@
 
             <!-- Step 1: Personal Details -->
             <div id="step1-fields">
+                {% if not kyc_required %}
                 <div class="reg-form-group">
                     <label for="reg-name">Full Name <span class="required">*</span></label>
                     <input type="text" id="reg-name" class="reg-input" placeholder="Enter your full name" maxlength="80" autocomplete="name">
                 </div>
+                {% endif %}
                 <div class="reg-form-group">
                     <label for="reg-aadhaar">Aadhaar Card Number <span class="required">*</span></label>
                     <input type="text" id="reg-aadhaar" class="reg-input" placeholder="Enter 12-digit Aadhaar number" maxlength="12" inputmode="numeric" autocomplete="off">
@@ -383,6 +385,25 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% if kyc_required %}
+                <div class="reg-form-group">
+                    <label for="kyc-file">Aadhaar Offline e-KYC file (ZIP) <span class="required">*</span></label>
+                    <input type="file" id="kyc-file" class="reg-input" accept=".zip,application/zip">
+                </div>
+                <div class="reg-form-group">
+                    <label for="kyc-share">Share code <span class="required">*</span></label>
+                    <input type="password" id="kyc-share" class="reg-input" placeholder="The share code you chose when downloading" maxlength="64" autocomplete="off">
+                </div>
+                <details class="otp-help" style="margin: 0 0 16px; font-size: 0.92em; color: #444;">
+                    <summary style="cursor: pointer; font-weight: bold;">Why is this needed, and how do I get the file?</summary>
+                    <ul style="margin: 8px 0 0 18px; line-height: 1.55;">
+                        <li>It proves that <b>you</b> are the Aadhaar holder: UIDAI signs the file, and you can only download it by logging in on UIDAI's own website with an OTP sent to your Aadhaar-linked mobile. Knowing someone's Aadhaar number is not enough.</li>
+                        <li>Get it at <b>myaadhaar.uidai.gov.in</b>: log in with your Aadhaar number (or VID) and the OTP, choose <b>Offline e-KYC</b> (also called Paperless Offline e-KYC), set a share code and download the ZIP. The menu names on UIDAI's site may change.</li>
+                        <li>Upload the ZIP exactly as downloaded (do not unzip or edit it) and type the share code. Use the <b>mobile number linked to your Aadhaar</b>. The file must be less than 3 days old and you must be at least {{ min_age }} years old.</li>
+                        <li>The file is read once to confirm your identity. It and the share code are <b>not stored</b>.</li>
+                    </ul>
+                </details>
+                {% endif %}
                 <button type="button" class="reg-submit-btn" id="next-to-photo-btn">
                     Next: Add Photo <span class="material-icons">arrow_forward</span>
                 </button>
@@ -434,6 +455,16 @@
                 <div style="text-align: center; margin-top: 10px;">
                     <button type="button" class="link-btn" id="resend-btn" disabled>Resend OTP</button>
                 </div>
+                <details class="otp-help" style="margin-top: 14px; font-size: 0.92em; color: #444;">
+                    <summary style="cursor: pointer; font-weight: bold;">Didn't receive the code?</summary>
+                    <ul style="margin: 8px 0 0 18px; line-height: 1.55;">
+                        <li>Wait up to 2 minutes - text messages can be delayed.</li>
+                        <li>Check that the number shown above is yours. If it is wrong, reload this page and start again.</li>
+                        <li>Look in your blocked / spam messages, and switch off any "filter unknown senders" or Do-Not-Disturb setting for a moment.</li>
+                        <li>Press <b>Resend</b> only after the timer ends - pressing it repeatedly makes delivery worse.</li>
+                    </ul>
+                </details>
+
             </div>
 
             <!-- Step 4: Success -->
@@ -467,10 +498,11 @@
     <div id="recaptcha-container"></div>
     {% if otp_mode == 'firebase' %}<script src="{{ url_for('static', filename='firebase_otp.js') }}"></script>{% endif %}
     <script>
-        const FIREBASE_CONFIG = {{ firebase_config|tojson }};   // public web config, or null when not using Firebase
+        const FIREBASE_CONFIG = {{ firebase_config|tojson }};
+        const KYC_REQUIRED = {{ kyc_required|tojson }};   // Aadhaar offline e-KYC file needed (server setting)   // public web config, or null when not using Firebase
         const $ = (id) => document.getElementById(id);
         let selectedFile = null, camStream = null, resendTimer = null;
-        let firebaseMode = false, firebaseReady = false, regPhone = '';
+        let firebaseMode = false, firebaseReady = false, regPhone = '', verifiedName = '';
 
         function showError(msg) {
             const el = $('reg-error');
@@ -494,11 +526,16 @@
         // ---------- Step 1 ----------
         $('next-to-photo-btn').addEventListener('click', () => {
             clearError();
-            const name = $('reg-name').value.trim();
-            if (name.length < 2) { return showError('Please enter your full name.'); }
+            if (!KYC_REQUIRED && $('reg-name').value.trim().length < 2) { return showError('Please enter your full name.'); }
             if (!/^[0-9]{12}$/.test($('reg-aadhaar').value.trim())) { return showError('Please enter a valid 12-digit Aadhaar number.'); }
             if (!/^[6-9][0-9]{9}$/.test($('reg-phone').value.trim())) { return showError('Please enter a valid 10-digit mobile number.'); }
             if (!$('reg-constituency').value) { return showError('Please select your constituency.'); }
+            if (KYC_REQUIRED) {
+                const f = $('kyc-file').files[0];
+                if (!f) { return showError('Please choose your Aadhaar offline e-KYC ZIP file.'); }
+                if (!/\.zip$/i.test(f.name) || f.size > 1000000) { return showError('That does not look like the ZIP downloaded from UIDAI (it must end in .zip and be under 1 MB).'); }
+                if (!$('kyc-share').value.trim()) { return showError('Please enter the share code you chose when downloading the file.'); }
+            }
             goStep(2);
         });
         $('back-to-1-btn').addEventListener('click', () => { clearError(); goStep(1); });
@@ -559,7 +596,7 @@
         }
 
         function showOtpStep(data) {
-            $('otp-sent-msg').textContent = data.message;
+            $('otp-sent-msg').textContent = data.message + (verifiedName ? ' Identity verified by UIDAI file: ' + verifiedName + '.' : '');
             const demo = $('demo-otp');
             if (data.otp) { $('demo-otp-code').textContent = data.otp; demo.classList.add('visible'); }
             else { demo.classList.remove('visible'); }
@@ -587,7 +624,7 @@
                 if (!firebaseReady) { await window.FirebaseOtp.init(FIREBASE_CONFIG); firebaseReady = true; }
                 await window.FirebaseOtp.sendCode(regPhone, 'recaptcha-container');
             } catch (err) { return showError(window.FirebaseOtp.describeError(err)); }
-            showOtpStep({ message: 'We sent a verification code to +91 ' + regPhone.slice(0, 2) + 'XXXXXX' + regPhone.slice(-2) + '.' });
+            showOtpStep({ message: 'We sent a verification code to +91 ' + regPhone.slice(0, 2) + 'XXXXXX' + regPhone.slice(-2) + ' (requested at ' + new Date().toLocaleTimeString() + ').' });
         }
 
         // ---------- Step 2 -> server: validate photo + send OTP ----------
@@ -598,7 +635,12 @@
             const original = btn.innerHTML;
             btn.disabled = true; btn.textContent = 'Checking photo…';
             const fd = new FormData();
-            fd.append('name', $('reg-name').value.trim());
+            if (KYC_REQUIRED) {
+                fd.append('kyc_zip', $('kyc-file').files[0]);
+                fd.append('share_code', $('kyc-share').value.trim());
+            } else {
+                fd.append('name', $('reg-name').value.trim());
+            }
             fd.append('aadhaar', $('reg-aadhaar').value.trim());
             fd.append('phone', $('reg-phone').value.trim());
             fd.append('constituency', $('reg-constituency').value);
@@ -606,7 +648,7 @@
             try {
                 const res = await fetch('/register/start', { method: 'POST', body: fd });
                 const data = await res.json();
-                if (data.success) { if (data.mode === 'firebase') { await startFirebaseOtp(data); } else { showOtpStep(data); } }
+                if (data.success) { verifiedName = data.verified_name || ''; if (data.mode === 'firebase') { await startFirebaseOtp(data); } else { showOtpStep(data); } }
                 else { showError(data.message || 'Registration failed.'); }
             } catch (e) { showError('Connection error. Please try again.'); }
             btn.disabled = false; btn.innerHTML = original;
@@ -642,7 +684,7 @@
             if (firebaseMode) {
                 try {
                     await window.FirebaseOtp.sendCode(regPhone, 'recaptcha-container');
-                    $('otp-sent-msg').textContent = 'A new verification code has been sent.';
+                    $('otp-sent-msg').textContent = 'A new verification code was requested at ' + new Date().toLocaleTimeString() + '.';
                     startResendCooldown(30);
                 } catch (err) { showError(window.FirebaseOtp.describeError(err)); }
                 return;

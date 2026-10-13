@@ -29,11 +29,12 @@ PERSON_C = [0.0, 0.0, 1.0, 0.0]
 class FakeFaceService:
     """Stands in for DeepFaceService; tests choose what 'the camera sees'."""
     match_threshold = 0.55
-    duplicate_threshold = 0.35
+    duplicate_threshold = 0.60          # mirrors the production default
 
     def __init__(self):
         self.faces = [self.face(PERSON_A)]
         self.crop_embedding = PERSON_A          # what embed_crop() "sees" (used by the liveness step)
+        self.queue = []                         # optional: one answer per detect() call, then falls back to .faces
 
     @staticmethod
     def face(emb, ratio=0.4):
@@ -43,6 +44,8 @@ class FakeFaceService:
         return True
 
     def detect(self, img):
+        if self.queue:
+            return list(self.queue.pop(0))
         return list(self.faces)
 
     def embed_crop(self, face_bgr):

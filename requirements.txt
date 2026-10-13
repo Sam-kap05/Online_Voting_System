@@ -11,8 +11,14 @@ deepface>=0.0.93
 tf-keras
 retina-face>=0.0.17   # landmarks for liveness (also pulled in by deepface)
 
-# Production server (optional):  gunicorn -w 1 --threads 4 "app:create_app()"
-gunicorn>=22
+# Production web server: `python serve.py` (waitress works on Windows, Linux and macOS)
+waitress>=3.0
+gunicorn>=22; sys_platform != 'win32'   # optional alternative on Linux/macOS
+
+# Aadhaar offline e-KYC verification: XML signature check, encrypted ZIP, safe XML parsing
+signxml>=4.0
+pyzipper>=0.3.6
+lxml>=5.0
 
 # Firebase phone-OTP: verifies Firebase ID tokens on the server
 PyJWT>=2.8

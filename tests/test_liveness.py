@@ -290,13 +290,15 @@ def face_ok(ctx):
     return c
 
 
-def lframe(ctx, client, yaw=0.0, n_pose_faces=1, identity=PERSON_A):
+def lframe(ctx, client, yaw=0.0, n_pose_faces=1, identity=PERSON_A, swap=None):
     """One liveness frame. `identity` = what the RetinaFace crop embeds to; the pose analyzer decides
     how many faces are in view. The frontal (Haar) detector must NOT be needed here."""
     ctx.pose.reading = PoseReading(n_pose_faces, yaw if n_pose_faces == 1 else None)
     ctx.fake.crop_embedding = identity
-    r = client.post("/liveness/frame", data={"frame": (io.BytesIO(jpeg()), "f.jpg")},
-                    content_type="multipart/form-data")
+    data = {"frame": (io.BytesIO(jpeg()), "f.jpg")}
+    if swap is not None:
+        data["swap"] = swap
+    r = client.post("/liveness/frame", data=data, content_type="multipart/form-data")
     return r.status_code, r.get_json()
 
 
@@ -568,3 +570,83 @@ class TestEndpoints:
         assert face_ok.get("/voting-page").status_code == 200
         body = face_ok.post("/liveness/start").get_json()
         assert body["required"] is False and body["verified"] is True
+
+
+# ================================================= mirrored cameras: left/right swap
+class TestDirectionSwap:
+    def test_flip_reverses_which_way_counts(self, monkeypatch):
+        forced(monkeypatch, ["left", "right", "left"])
+        # facing prompt "left": a camera that mirrors the picture shows the nose moving to the image LEFT
+        _, normal = run([0, 0, -.3, -.3])
+        assert "wrong_way" in normal
+        state = lv.new_challenge(1000.0, CFG)
+        t, sts = 1000.0, []
+        for y in [0, 0, -.3, -.3]:
+            t += .5
+            state, st = lv.step(state, y, t, CFG, flip=True)
+            sts.append(st)
+        assert sts == ["calibrating", "turn", "holding", "step_done"]
+
+    def test_full_run_with_a_mirrored_camera_via_the_swap_field(self, ctx, face_ok, monkeypatch):
+        forced(monkeypatch, ["left", "right", "left"])
+        face_ok.post("/liveness/start")
+        mirrored = [-y for y in HAPPY]                       # what a mirroring camera reports for the same head movements
+        out = None
+        for y in mirrored:
+            _, out = lframe(ctx, face_ok, y, swap="1")
+        assert out["verified"] is True
+
+    def test_without_swap_a_mirrored_camera_gets_wrong_way(self, ctx, face_ok, monkeypatch):
+        forced(monkeypatch, ["left", "right", "left"])
+        face_ok.post("/liveness/start")
+        statuses = [lframe(ctx, face_ok, -y)[1]["status"] for y in HAPPY[:5]]
+        assert "wrong_way" in statuses and "step_done" not in statuses
+
+    def test_site_wide_flag_and_per_device_swap_combine_with_xor(self, ctx, face_ok, monkeypatch):
+        forced(monkeypatch, ["left", "right", "left"])
+        ctx.app.extensions["liveness_cfg"].flip_directions = True     # LIVENESS_FLIP_DIRECTIONS=1
+        face_ok.post("/liveness/start")
+        # this voter's camera is NOT mirrored, so they press "swap": the two cancel out -> normal behaviour
+        out = None
+        for y in HAPPY:
+            _, out = lframe(ctx, face_ok, y, swap="1")
+        assert out["verified"] is True
+
+    def test_site_wide_flag_alone(self, ctx, face_ok, monkeypatch):
+        forced(monkeypatch, ["left", "right", "left"])
+        ctx.app.extensions["liveness_cfg"].flip_directions = True
+        face_ok.post("/liveness/start")
+        out = None
+        for y in [-v for v in HAPPY]:
+            _, out = lframe(ctx, face_ok, y)
+        assert out["verified"] is True
+
+    @pytest.mark.parametrize("bad", ["", "0", "yes", "true", "2"])
+    def test_only_the_exact_value_one_swaps(self, ctx, face_ok, monkeypatch, bad):
+        forced(monkeypatch, ["left", "right", "left"])
+        face_ok.post("/liveness/start")
+        out = None
+        for y in HAPPY:
+            _, out = lframe(ctx, face_ok, y, swap=bad)
+        assert out["verified"] is True                       # unrecognised values behave like "no swap"
+
+    def test_swapping_does_not_help_a_flat_photo(self, ctx, face_ok, monkeypatch):
+        forced(monkeypatch, ["left", "right", "left"])
+        face_ok.post("/liveness/start")
+        for swap in ("0", "1"):
+            out = None
+            for y in [0, 0] + [0.137, -0.137] * 8:
+                _, out = lframe(ctx, face_ok, y, swap=swap)
+            assert out["verified"] is False
+
+    def test_env_flag_parsing(self):
+        assert LivenessConfig.from_env({"LIVENESS_FLIP_DIRECTIONS": "1"}).flip_directions is True
+        assert LivenessConfig.from_env({"LIVENESS_FLIP_DIRECTIONS": "true"}).flip_directions is True
+        assert LivenessConfig.from_env({}).flip_directions is False
+        assert LivenessConfig.from_env({"LIVENESS_FLIP_DIRECTIONS": "0"}).flip_directions is False
+
+    def test_verify_page_exposes_the_flag_and_the_swap_link(self, ctx):
+        html = ctx.app.test_client().get("/verify").get_data(as_text=True)
+        assert "const LIVENESS_FLIP = false" in html and 'id="swap-lr"' in html
+        ctx.app.extensions["liveness_cfg"].flip_directions = True
+        assert "const LIVENESS_FLIP = true" in ctx.app.test_client().get("/verify").get_data(as_text=True)

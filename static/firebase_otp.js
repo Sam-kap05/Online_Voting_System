@@ -26,11 +26,27 @@
     return sdk;
   }
 
+  // Log the full Firebase error where a developer can read it (browser DevTools > Console).
+  function logError(where, err) {
+    console.error('[FirebaseOtp] ' + where + ' failed:', err && err.code, err && err.message, err);
+  }
+
   async function init(config) {
     const m = await loadSdk();
-    const app = m.getApps().length ? m.getApp() : m.initializeApp(config);
+    const testMode = !!config.testMode;
+    const fbConfig = Object.assign({}, config); delete fbConfig.testMode;   // not a Firebase option
+    const app = m.getApps().length ? m.getApp() : m.initializeApp(fbConfig);
     auth = m.getAuth(app);
     auth.languageCode = 'en';
+    if (testMode) {
+      // DEV ONLY: skips reCAPTCHA so Firebase's fictional "test phone numbers" work. Real numbers still need reCAPTCHA.
+      auth.settings.appVerificationDisabledForTesting = true;
+      console.warn('[FirebaseOtp] TEST MODE: reCAPTCHA is disabled; only Firebase test phone numbers will work.');
+    }
+    if (/^[0-9.]+$/.test(window.location.hostname) || window.location.hostname.indexOf(':') >= 0) {
+      console.warn('[FirebaseOtp] You are on an IP address (' + window.location.hostname + '). Firebase reCAPTCHA only accepts ' +
+                   'hostnames listed under Authentication > Settings > Authorized domains. Prefer http://localhost or a real domain.');
+    }
     return auth;
   }
 
@@ -50,12 +66,27 @@
     if (!/^[6-9][0-9]{9}$/.test(phone10)) { throw Object.assign(new Error('bad phone'), { code: 'auth/invalid-phone-number' }); }
     const m = await loadSdk();
     confirmation = null;
-    confirmation = await m.signInWithPhoneNumber(auth, '+91' + phone10, freshVerifier(m, containerId || 'recaptcha-container'));
+    try {
+      confirmation = await m.signInWithPhoneNumber(auth, '+91' + phone10, freshVerifier(m, containerId || 'recaptcha-container'));
+    } catch (err) {
+      logError('sendCode', err);
+      throw err;
+    }
+    // Firebase answers "accepted" the moment it queues the SMS; it never reports delivery to the browser.
+    console.info('[FirebaseOtp] Firebase accepted the code request for +91 ' + phone10.slice(0, 2) + 'XXXXXX' + phone10.slice(-2) +
+                 ' at ' + new Date().toLocaleTimeString() + '. If no SMS arrives, the problem is delivery (test number, carrier/DND ' +
+                 'filtering, region policy, billing) - not this app. See README: "Firebase accepted the request but no SMS arrives".');
   }
 
   async function confirmCode(code) {
     if (!confirmation) { throw Object.assign(new Error('no code requested'), { code: 'app/no-pending-code' }); }
-    const credential = await confirmation.confirm(String(code));
+    let credential;
+    try {
+      credential = await confirmation.confirm(String(code));
+    } catch (err) {
+      logError('confirmCode', err);
+      throw err;
+    }
     const token = await credential.user.getIdToken();
     try { await auth.signOut(); } catch (e) { /* not needed */ }
     confirmation = null;
@@ -69,8 +100,6 @@
     'auth/quota-exceeded': 'The SMS limit has been reached. Please try again later.',
     'auth/invalid-verification-code': 'Incorrect code. Please check it and try again.',
     'auth/code-expired': 'That code has expired. Please request a new one.',
-    'auth/captcha-check-failed': 'Security check failed. Please reload the page and try again.',
-    'auth/missing-app-credential': 'Security check failed. Please reload the page and try again.',
     'auth/network-request-failed': 'Network problem. Please check your connection and try again.',
     'auth/operation-not-allowed': 'Phone sign-in is not enabled for this project, or SMS to your region is blocked.',
     'auth/billing-not-enabled': 'Real SMS needs the Firebase Blaze plan. Use a Firebase test number, or upgrade the plan.',
@@ -78,8 +107,20 @@
     'app/no-pending-code': 'Please request a verification code first.',
   };
 
+  // reCAPTCHA / domain problems all look alike to the voter but have one fix: the web address in the browser bar
+  // must be listed in Firebase. Name that address so the operator can add exactly it.
+  const DOMAIN_CODES = ['auth/captcha-check-failed', 'auth/missing-app-credential', 'auth/invalid-app-credential',
+                        'auth/unauthorized-domain', 'auth/app-not-authorized'];
+
   function describeError(err) {
-    return MESSAGES[err && err.code] || 'Could not verify the mobile number. Please try again.';
+    const code = (err && err.code) || '';
+    if (DOMAIN_CODES.indexOf(code) >= 0) {
+      return 'Security check failed (' + code + '). Firebase did not accept the web address "' + window.location.host +
+             '". Open the Firebase console > Authentication > Settings > Authorized domains and add "' + window.location.hostname +
+             '". Also turn off ad-blockers or a VPN for this page, then reload.';
+    }
+    const base = MESSAGES[code] || 'Could not verify the mobile number. Please try again.';
+    return code ? base + ' (' + code + ')' : base;
   }
 
   window.FirebaseOtp = {

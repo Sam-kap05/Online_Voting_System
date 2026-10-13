@@ -60,7 +60,7 @@ class DeepFaceService:
         min_confidence: float = 0.6,
         min_face_ratio: float = 0.08,
         match_threshold: float = 0.55,
-        duplicate_threshold: float = 0.35,
+        duplicate_threshold: float = 0.60,
         max_width: int = 640,
     ):
         self.model_name = model_name
@@ -69,7 +69,8 @@ class DeepFaceService:
         self.min_face_ratio = min_face_ratio
         # cosine distance: <= match_threshold  => same person (login check)
         self.match_threshold = match_threshold
-        # stricter: <= duplicate_threshold => "this face is already registered"
+        # <= duplicate_threshold => "this face is already registered". 0.60: same person across DIFFERENT photos
+        # measured at median 0.42 / max 0.62, different people never closer than 0.69 (see README)
         self.duplicate_threshold = duplicate_threshold
         self.max_width = max_width
         self._lock = threading.Lock()  # TensorFlow models are not re-entrant

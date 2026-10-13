@@ -80,6 +80,7 @@ class LivenessConfig:
     anchor_center: float = 0.40    # max distance to the session face while facing the camera
     anchor_turned: float = 0.55    # max distance while the head is turned (VGG is pose-sensitive)
     registered_fallback: float = 0.60  # only used if a session somehow has no anchor
+    flip_directions: bool = False  # camera delivers a MIRRORED picture: swap what "left"/"right" mean (LIVENESS_FLIP_DIRECTIONS=1)
 
     @classmethod
     def from_env(cls, env=None) -> "LivenessConfig":
@@ -93,6 +94,7 @@ class LivenessConfig:
             raw = env.get(f"LIVENESS_{name.upper()}")
             if raw not in (None, ""):
                 setattr(cfg, name, kind(raw))
+        cfg.flip_directions = str(env.get("LIVENESS_FLIP_DIRECTIONS", "")).strip().lower() in ("1", "true", "yes")
         if cfg.steps < 2:
             raise ValueError("LIVENESS_STEPS must be at least 2 (both directions are required)")
         if cfg.center_max >= cfg.turn_min:
@@ -129,7 +131,7 @@ def expired(state: dict, now: float, cfg: LivenessConfig) -> bool:
                                          or now - state["step_started"] > cfg.step_timeout)
 
 
-def step(state: dict, yaw: float, now: float, cfg: LivenessConfig) -> Tuple[dict, str]:
+def step(state: dict, yaw: float, now: float, cfg: LivenessConfig, flip: bool = False) -> Tuple[dict, str]:
     """Advance the challenge with one validated frame. Returns (new_state, status).
 
     status: calibrating | recalibrate | turn | holding | step_done | return_center |
@@ -161,6 +163,8 @@ def step(state: dict, yaw: float, now: float, cfg: LivenessConfig) -> Tuple[dict
 
     want = s["seq"][s["idx"]]                     # phase == "turn"
     signed = rel if want == "left" else -rel
+    if flip:                                      # mirrored camera: the picture's left/right are the voter's right/left
+        signed = -signed
     if signed >= cfg.turn_min:
         s["hold"] += 1
         if s["hold"] < cfg.hold_frames:
